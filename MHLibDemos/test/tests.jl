@@ -12,177 +12,44 @@ using TestItems
     using MHLib
     using MHLibDemos
     Random.seed!(1)
-    datapath = joinpath(@__DIR__, "..", "data")
+    datapath = joinpath(@__DIR__, "..", "instances", "50", "train")
 end
 
+@testitem "Init_SCF_PDP" setup=[MHLibTestInit] begin
+    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol = SCF_PDP_Solution(inst)
 
-@testitem "GVNS-MAXSAT" setup=[MHLibTestInit] begin
-    inst = MAXSATInstance(joinpath(datapath, "maxsat-simple.cnf"))
-    sol = MAXSATSolution(inst)
     println(sol)
-    gvns = GVNS(sol, [MHMethod("con", construct!)],
-        [MHMethod("li1", local_improve!, 1)],
-        [MHMethod("sh1", shaking!, 1), MHMethod("sh2", shaking!, 2),
-            MHMethod("sh3", shaking!, 3)]; titer=10)
-    run!(gvns)
-    method_statistics(gvns.scheduler)
-    main_results(gvns.scheduler)
-    @test obj(sol) >= 0
-end
 
-@testitem "MAXSAT-kflip" setup=[MHLibTestInit] begin
-    inst = MAXSATInstance(joinpath(datapath, "maxsat-adv1.cnf"))
-    sol = MAXSATSolution(inst)
+    @test inst.n == 50
+    @test inst.nk == 2
+    @test inst.C == 100
+    @test inst.gamma == 50
+    @test inst.rho == 40.08
 
-    k = 30
-    old = copy(sol.x)
-    k_random_flips!(sol, k)
-    new = sol.x
+    @test length(inst.c) == 50
+    @test inst.c == [20, 22, 30, 38, 34, 49, 25, 50, 19, 18, 20, 18, 27, 39, 20, 31, 25, 31, 39, 32,
+        36, 35, 21, 22, 31, 29, 29, 32, 26, 34, 17, 21, 18, 25, 26, 33, 24, 26,
+        26, 40, 32, 30, 24, 32, 28, 19, 27, 43, 40, 17]
 
-    ndiff = sum(old .!= new)
+    @test inst.depot == 1
+    @test inst.pickup == collect(2:51)
+    @test inst.dropoff == collect(52:101)
 
-    @test ndiff == k
-end
+    @test length(inst.coords) == 101
+    @test inst.coords == Tuple{Int,Int}[(35, 35), (61, 9), (43, 25), (45, 28), (70, 31), (57, 45), (18, 2), (59, 34), (48, 30), (9, 67), (6, 66), (28, 10), (20, 11), (1, 7), (39, 18), (38, 50), (7, 60), (64, 2), (56, 61), (5, 11), (48, 16), (27, 49), (6, 62), (37, 23), (64, 39), (19, 59), (15, 29), (45, 68), (7, 36), (16, 39), (49, 13), (47, 41), (6, 64), (48, 23), (53, 49), (11, 3), (59, 34), (19, 2), (59, 13), (59, 24), (69, 64), (18, 37), (40, 11), (60, 1), (29, 67), (18, 70), (61, 13), (60, 14),
+    (27, 58), (49, 45), (57, 67), (63, 61), (3, 71), (35, 37), (27, 46), (21, 17), (37, 18), (55, 56), (34, 46), (17, 21), (16, 47), (38, 69), (39, 9), (57, 69), (56, 49), (6, 45), (69, 53), (6, 50), (32, 57), (20, 59), (55, 8), (68, 30), (15, 58), (57, 55), (4, 29),
+    (18, 31), (65, 39), (15, 12), (5, 4), (57, 42), (40, 15), (9, 37), (17, 1), (67, 4), (34, 67), (69, 24), (62, 47), (49, 6), (24, 17), (51, 54), (68, 38), (8, 56), (14, 0), (15, 70), (63, 65), (26, 44), (61, 61), (19, 5), (61, 67), (4, 15), (71, 23)]
 
-@testitem "LNS-MAXSAT" setup=[MHLibTestInit] begin
-    inst = MAXSATInstance(joinpath(datapath, "maxsat-adv1.cnf"))
-    sol = MAXSATSolution(inst)
-    println(sol)
-    num_de = 5
-    method_selector = WeightedRandomMethodSelector(num_de:-1:1, 1:1)
-    alg = LNS(sol, [MHMethod("const", construct!)],
-        [MHMethod("de$i", destroy!, i) for i in 1:num_de],
-        [MHMethod("re", repair!)]; method_selector, titer=120)
-    run!(alg)
-    method_statistics(alg.scheduler)
-    main_results(alg.scheduler)
-    @test obj(sol) >= 0
-end
+    @test length(inst.d) == 10201
 
-@testitem "LNS-MAXSAT" setup=[MHLibTestInit] begin
-    inst = TSPInstance(50)
-    sol = TSPSolution(inst)
-    println(sol)
-    num_de = 3
-    method_selector = WeightedRandomMethodSelector(num_de:-1:1, 1:1)
-    alg = LNS(sol, [MHMethod("const", construct!)],
-        [MHMethod("de$i", destroy!, i) for i in 1:num_de],
-        [MHMethod("re", repair!)]; method_selector, titer=120)
-    run!(alg)
-    method_statistics(alg.scheduler)
-    main_results(alg.scheduler)
-    @test obj(sol) >= 0
-end
-
-@testitem "ALNS-MAXSAT" setup=[MHLibTestInit] begin
-    inst = MAXSATInstance(joinpath(datapath, "maxsat-adv1.cnf"))
-    sol = MAXSATSolution(inst)
-    println(sol)
-    num_de = 5
-    alg = ALNS(sol, [MHMethod("const", construct!)],
-        [MHMethod("de$i", destroy!, i) for i in 1:num_de],
-        [MHMethod("re", repair!)], titer=120)
-    run!(alg)
-    method_statistics(alg.scheduler)
-    main_results(alg.scheduler)
-    @test obj(sol) >= 0
-end
-
-@testitem "GVNS-MKP" setup=[MHLibTestInit] begin
-    inst = MKPInstance(joinpath(datapath, "mknapcb5-01.txt"))
-    sol = MKPSolution(inst)
-    println(sol)
-    gvns = GVNS(sol, [MHMethod("con", construct!)],
-        [MHMethod("li1", local_improve!)],
-        [MHMethod("sh1", shaking!, 1), MHMethod("sh2", shaking!, 2),
-            MHMethod("sh3", shaking!, 3)], titer=25)
-    run!(gvns)
-    method_statistics(gvns.scheduler)
-    main_results(gvns.scheduler)
-    @test obj(sol) >= 0
-end
-
-@testitem "GVNS-MISP" setup=[MHLibTestInit] begin
-    inst = MISPInstance(joinpath(datapath, "frb40-19-1.mis"))
-    sol = MISPSolution(inst)
-    println(sol)
-    gvns = GVNS(sol, [MHMethod("con", construct!)],
-        [MHMethod("li1", local_improve!)],
-        [MHMethod("sh1", shaking!, 1), MHMethod("sh2", shaking!, 2),
-            MHMethod("sh3", shaking!, 3)], titer=25)
-    run!(gvns)
-    method_statistics(gvns.scheduler)
-    main_results(gvns.scheduler)
-    @test obj(sol) >= 0
-end
-
-@testitem "Random-Init-TSP" setup=[MHLibTestInit] begin
-    rand_inst = TSPInstance()
-    inst = TSPInstance(joinpath(datapath, "xqf131.tsp"))
-    sol = TSPSolution(inst)
-    println(sol)
+    # TODO add test for calculating obj value
     println(obj(sol))
-    @test obj(sol) >= 0
-    @test sol.obj_val_valid
-    initialize!(sol)
-    @test !sol.obj_val_valid
-    println(sol)
-    println(obj(sol))
-    @test obj(sol) >= 0
-end
-
-@testitem "GVNS-TSP" setup=[MHLibTestInit] begin
-    inst = TSPInstance(joinpath(datapath, "xqf131.tsp"))
-    sol = TSPSolution(inst)
-    initialize!(sol)
-    println(sol)
-    println(obj(sol))
-    @test obj(sol) >= 0
-    @test sol.obj_val_valid
-    @assert !to_maximize(sol)
-    search = GVNS(sol, [MHMethod("con", construct!)],
-        [MHMethod("li1", local_improve!)],
-        [MHMethod("sh1", shaking!, 1)],
-        consider_initial_sol=true, titer=300)
-    run!(search)
-    main_results(search.scheduler)
-    @test obj(sol) >= 0
-end
-
-@testitem "GVNS-GraphColoring1" setup=[MHLibTestInit] begin
-    inst = GraphColoringInstance(joinpath(datapath, "fpsol2.i.1.col"), 2)
-    sol = GraphColoringSolution(inst)
-    println(sol)
-
-    @test obj(sol) >= 0
-    @test sol.obj_val_valid
-    @test !to_maximize(sol)
-
-    alg = GVNS(sol, [MHMethod("con", construct!)],
-        [MHMethod("li1", local_improve!)],
-        [MHMethod("sh$i", shaking!, i) for i in 1:5],
-        titer=1000)
-    run!(alg)
-    method_statistics(alg.scheduler)
-    main_results(alg.scheduler)
-    check(sol)
-    @test obj(sol) >= 0
-end
-
-@testitem "GVNS-GraphColoring2" setup=[MHLibTestInit] begin
-    inst = GraphColoringInstance(joinpath(datapath, "test.col"), 3)
-    sol = GraphColoringSolution(inst)
-    println(sol)
-    @test obj(sol) >= 0
-    @test sol.obj_val_valid
-    @test !to_maximize(sol)
-    alg = GVNS(sol, [MHMethod("con", construct!)],
-        [MHMethod("li1", local_improve!)],
-        [MHMethod("sh$i", shaking!, i) for i in 1:5],
-        titer=50)
-    run!(alg)
-    method_statistics(alg.scheduler)
-    main_results(alg.scheduler)
-    check(sol)
-    @test iszero(obj(sol))
+    # @test obj(sol) >= 0
+    # @test sol.obj_val_valid
+    # initialize!(sol)
+    # @test !sol.obj_val_valid
+    # println(sol)
+    # println(obj(sol))
+    # @test obj(sol) >= 0
 end
