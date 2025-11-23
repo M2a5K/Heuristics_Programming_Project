@@ -28,10 +28,10 @@ function run_construction_experiments(;
                          fairness=f_r, obj=o_r))
         end
 
-        sol_pilot = solve_scfpdp("pilot"; filename, seed)
-        t_p, f_p, o_p = decompose_objective(sol_pilot)
-        push!(rows, (; alg="pilot", alpha=NaN, seed, total_time=t_p,
-                     fairness=f_p, obj=o_p))
+        # sol_pilot = solve_scfpdp("pilot"; filename, seed)
+        # t_p, f_p, o_p = decompose_objective(sol_pilot)
+        # push!(rows, (; alg="pilot", alpha=NaN, seed, total_time=t_p,
+        #              fairness=f_p, obj=o_p))
     end
 
     df = DataFrame(rows)
