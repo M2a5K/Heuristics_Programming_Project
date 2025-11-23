@@ -7,14 +7,19 @@ authors = ["Guenther Raidl <raidl@ac.tuwien.ac.at> et al."]
 projects = ["docs", "MHLibDemos"]
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+MHLibDemos = "684acab6-7f56-4bd3-8ecb-3989322bafbb"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [compat]
+CSV = "0.10.15"
+DataFrames = "1.8.1"
 DataStructures = "0.18, 0.19"
 Logging = "1"
 Printf = "1"

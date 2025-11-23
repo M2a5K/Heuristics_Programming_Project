@@ -65,3 +65,75 @@ end
     println(sol)
     println("Objective value after calling initialize!: $obj_value")
 end
+
+@testitem "SCF_PDP_NNDeterministic" setup=[MHLibTestInit] begin
+    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol  = SCF_PDP_Solution(inst)
+
+    MHLibDemos.construct_nn_det!(sol)
+    @test MHLibDemos.is_feasible(sol)
+    @test isfinite(sol.obj_val)
+    @test count(sol.served) <= inst.gamma
+    @test count(sol.served) > 0
+    served_idx = findall(sol.served)
+    nodes = vcat(sol.routes...)  
+    for r in served_idx
+        p = inst.pickup[r]
+        q = inst.dropoff[r]
+        @test p in nodes
+        @test q in nodes
+    end
+    @info "NN_det produced" routes=sol.routes served=count(sol.served) obj=sol.obj_val
+end
+
+
+@testitem "SCF_PDP_NNRand" setup=[MHLibTestInit] begin
+    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol  = SCF_PDP_Solution(inst)
+
+    MHLibDemos.construct_nn_rand!(sol; alpha=0.3)
+    @test MHLibDemos.is_feasible(sol)
+    @test isfinite(sol.obj_val)
+    @test count(sol.served) <= inst.gamma
+    @test count(sol.served) > 0
+end
+
+@testitem "SCF_PDP_NNRand_MultiStart" setup=[MHLibTestInit] begin
+    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+
+    # local redefinition to be able to run the test 
+    function multistart_randomized_construction_test(inst; alpha=0.3, iters=20)
+        best = nothing
+        best_val = Inf
+
+        for _ in 1:iters
+            s = SCF_PDP_Solution(inst)
+            MHLibDemos.construct_nn_rand!(s; alpha)
+
+            if s.obj_val < best_val
+                best = copy(s)
+                best_val = s.obj_val
+            end
+        end
+
+        return best
+    end
+
+    sol_best = multistart_randomized_construction_test(inst; alpha=0.3, iters=20)
+
+    @test MHLibDemos.is_feasible(sol_best)
+    @test isfinite(sol_best.obj_val)
+    @test count(sol_best.served) == inst.gamma
+end
+
+
+@testitem "SCF_PDP_Pilot" setup=[MHLibTestInit] begin
+    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol  = SCF_PDP_Solution(inst)
+
+    MHLibDemos.construct_pilot!(sol)
+    @test MHLibDemos.is_feasible(sol)
+    @test isfinite(sol.obj_val)
+    @test count(sol.served) <= inst.gamma
+    @test count(sol.served) > 0
+end
