@@ -11,11 +11,11 @@ using Random
 using StatsBase
 using MHLib
 
-export SCF_PDP_Instance, SCF_PDP_Solution, solve_scf_pdp
+export SCFPDPInstance, SCFPDPSolution, solve_scfpdp
 
 
 """
-    SCF_PDP_Instance
+    SCFPDPInstance
 
 Selective Capacitated Fair Pickup and Delivery Problem (SCF-PDP) instance.
 
@@ -35,7 +35,7 @@ of a certain amount of goods from a specific pickup location to a corresponding 
 - `coords`: Euclidean coordinates of locations (including vehicle depot)
 - `d`: distance matrix
 """
-struct SCF_PDP_Instance
+struct SCFPDPInstance
     n::Int
     c::Vector{Int}
     gamma::Int
@@ -55,11 +55,11 @@ end
 
 # TODO remove this function
 # """
-#     SCF_PDP_Instance(coords, c, gamma, nk, C, rho)
+#     SCFPDPInstance(coords, c, gamma, nk, C, rho)
 
-# Create a SCF_PDP instance from given Euclidean coordinates and other parameters specific to the problem.
+# Create a SCFPDP instance from given Euclidean coordinates and other parameters specific to the problem.
 # """
-# function SCF_PDP_Instance(coords::Vector{Tuple{Int,Int}},
+# function SCFPDPInstance(coords::Vector{Tuple{Int,Int}},
 #     c::Vector{Int}, gamma::Int, nk::Int, C::Int, rho::Float64)
 
 #     n = length(c)
@@ -75,16 +75,16 @@ end
 #              end
 #         end
 #     end
-#     return SCF_PDP_Instance(n, c, gamma, nk, C, rho, d, coords_depot,
+#     return SCFPDPInstance(n, c, gamma, nk, C, rho, d, coords_depot,
 #         coords_pickup, coords_dropoff)
 # end
 
 """
-    SCF_PDP_Instance(file_name)
+    SCFPDPInstance(file_name)
 
-Read 2D Euclidean SCF_PDP instance from file.
+Read 2D Euclidean SCFPDP instance from file.
 """
-function SCF_PDP_Instance(file_name::AbstractString)
+function SCFPDPInstance(file_name::AbstractString)
     open(file_name) do f
         n, nk, C, gamma, rho = readline(f) |> strip |> split |> x -> 
             (parse(Int, x[1]), parse(Int, x[2]), parse(Int, x[3]),
@@ -129,7 +129,7 @@ function SCF_PDP_Instance(file_name::AbstractString)
         (length(coords) - 1)/2 != length(c) && 
             error("Number of request locations and demand values do not match in file $file_name")
         
-        return SCF_PDP_Instance(n, c, gamma, nk, C, rho, depot, pickup, dropoff, coords, d)
+        return SCFPDPInstance(n, c, gamma, nk, C, rho, depot, pickup, dropoff, coords, d)
     end
 end
 
@@ -152,9 +152,9 @@ end
 
 
 """
-    SCF_PDP_Solution
+    SCFPDPSolution
 
-Solution to a SCF_PDP instance
+Solution to a SCFPDP instance
 
 Structure:
 - `routes`: Vector of routes, each route is a vector of node indices.
@@ -163,8 +163,8 @@ Structure:
 - `obj_val`: cached objective value.
 - `obj_val_valid`: whether the cached objective is valid.
 """
-mutable struct SCF_PDP_Solution <: Solution
-    inst::SCF_PDP_Instance
+mutable struct SCFPDPSolution <: Solution
+    inst::SCFPDPInstance
     routes::Vector{Vector{Int}}     # length nK
     load::Vector{Int}               # length nK
     served::BitVector               # length n
@@ -173,29 +173,29 @@ mutable struct SCF_PDP_Solution <: Solution
 end
 
 """
-    SCF_PDP_Solution(inst::SCF_PDP_Instance)
+    SCFPDPSolution(inst::SCFPDPInstance)
 
 Create an empty solution where each vehicle has an empty route starting at the depot.
 """
-function SCF_PDP_Solution(inst::SCF_PDP_Instance)
+function SCFPDPSolution(inst::SCFPDPInstance)
     routes = [Int[] for _ in 1:inst.nk]
     load   = fill(0, inst.nk)
     served = falses(inst.n)
-    return SCF_PDP_Solution(inst, routes, load, served, Inf, false)
+    return SCFPDPSolution(inst, routes, load, served, Inf, false)
 end
 
-"SCF_PDP_Solution is minimization."
-MHLib.to_maximize(::SCF_PDP_Solution) = false
+"SCFPDPSolution is minimization."
+MHLib.to_maximize(::SCFPDPSolution) = false
 
-# SCF_PDP_Solution(inst::SCF_PDP_Instance) =
-#     SCF_PDP_Solution(inst, Vector{Int}[collect(1:inst.nk)], collect(1:inst.nk), Vector{Bool}(undef, inst.n), Inf, false)
+# SCFPDPSolution(inst::SCFPDPInstance) =
+#     SCFPDPSolution(inst, Vector{Int}[collect(1:inst.nk)], collect(1:inst.nk), Vector{Bool}(undef, inst.n), Inf, false)
 
 """
     copy!(s1, s2)
 
 Copy solution `s2` into `s1`.
 """
-function Base.copy!(s1::SCF_PDP_Solution, s2::SCF_PDP_Solution)
+function Base.copy!(s1::SCFPDPSolution, s2::SCFPDPSolution)
     s1.inst = s2.inst
     s1.routes = [copy(r) for r in s2.routes]
     s1.load   = copy(s2.load)
@@ -211,8 +211,8 @@ end
 
 Deep copy constructor.
 """
-function Base.copy(s::SCF_PDP_Solution)
-    return SCF_PDP_Solution(
+function Base.copy(s::SCFPDPSolution)
+    return SCFPDPSolution(
         s.inst,
         [copy(r) for r in s.routes],
         copy(s.load),
@@ -231,8 +231,8 @@ end
 
 Display the routes and basic info.
 """
-function Base.show(io::IO, s::SCF_PDP_Solution)
-    println(io, "SCF_PDP Solution:")
+function Base.show(io::IO, s::SCFPDPSolution)
+    println(io, "SCFPDP Solution:")
     for (k, r) in enumerate(s.routes)
         println(io, " Vehicle $k: ", r)
     end
@@ -242,7 +242,7 @@ end
 
 
 """
-    calc_objective(::SCF_PDP_Solution)
+    calc_objective(::SCFPDPSolution)
 
 Calculates the objective value for the SCF-PDP solution.
 
@@ -250,9 +250,9 @@ The objective consists of:
 1. Total travel time across all routes
 2. Fairness component based on the Jain fairness measure
 
-Returns the weighted sum: total_time + rho * variance
+Returns the weighted sum: total_time + rho * (1 - fairness)
 """
-function MHLib.calc_objective(s::SCF_PDP_Solution)
+function MHLib.calc_objective(s::SCFPDPSolution)
     inst = s.inst
     
     # If no requests are served, return a large penalty
@@ -291,15 +291,15 @@ function MHLib.calc_objective(s::SCF_PDP_Solution)
     fairness = (total_time ^ 2) / (length(s.routes) * sum(t^2 for t in route_times))
     
     # Objective: minimize total time + rho * variance
-    return total_time + inst.rho * fairness
+    return total_time + inst.rho * (1 - fairness)
 end
 
 """
-    initialize!(s::SCF_PDP_Solution)
+    initialize!(s::SCFPDPSolution)
 
 Initialize the solution with empty routes (all vehicles start and end at depot with no requests served).
 """
-function MHLib.initialize!(s::SCF_PDP_Solution)
+function MHLib.initialize!(s::SCFPDPSolution)
     # Reset all routes to empty
     for k in 1:s.inst.nk
         empty!(s.routes[k])
@@ -411,34 +411,45 @@ end
 # # -------------------------------------------------------------------------------
 
 """
-    solve_scf_pdp(alg::AbstractString, filename::AbstractString; seed=nothing, titer=1000, 
+    solve_scfpdp(alg::AbstractString, filename::AbstractString; seed=nothing, titer=1000, 
         kwargs...)
 
-Solve a given SCF_PDP instance with the algorithm `alg`.
+Solve a given SCFPDP instance with the algorithm `alg`.
 
 # Parameters
-- `filename`: File name of the SCF_PDP instance
-- `alg`: Algorithm to apply ("nn_det", "nn_rand", "pilot", "beam", "vnd", "grasp")
+- `filename`: File name of the SCFPDP instance
+- `alg`: Algorithm to apply ("nn_det", "nn_rand", "pilot", "beam", "ls", "vnd", "grasp")
 - `seed`: Possible random seed for reproducibility; if `nothing`, a random seed is chosen
 - `titer`: Number of iterations for the solving algorithm, gets a new default value
 - `kwargs`: Additional configuration parameters passed to the algorithm, e.g., `ttime`
 """
-function solve_scf_pdp(alg::AbstractString="nn_det",
-        filename::AbstractString=joinpath(@__DIR__, "..", "instances", "50", "train", "instance1_nreq50_nveh2_gamma50.txt");
+function solve_scfpdp(alg::AbstractString="nn_det",
+        filename::AbstractString=joinpath(dirname(dirname(pathof(MHLibDemos))), "instances", "50", "train", "instance1_nreq50_nveh2_gamma50.txt");
         seed=nothing, titer=1000, kwargs...)
-    # Make results reproducibly by either setting a given seed or picking one randomly
+    # Make results reproducible by either setting a given seed or picking one randomly
     isnothing(seed) && (seed = rand(0:typemax(Int32)))
     Random.seed!(seed)
 
-    println("SCF_PDP solver called with parameters:")
+    println("SCFPDP solver called with parameters:")
     println("alg=$alg, filename=$filename, seed=$seed, ", (; kwargs...))
 
-    inst = SCF_PDP_Instance(filename)
-    sol = SCF_PDP_Solution(inst)
-    initialize!(sol)
-    println(sol)
+    inst = SCFPDPInstance(filename)
 
-    # TODO this has not been adapted to SCF_PDP yet (still TSP baseline)
+    if alg in ("ls", "vnd", "grasp")
+        sol = SCFPDPSolution(inst)
+        initialize!(sol)
+        println(sol)
+    end
+
+    if alg == "nn_det"
+        # TODO implement
+    end
+
+    if alg == "ls"
+        # TODO implement
+    end
+
+    # TODO this has not been adapted to SCFPDP yet (still TSP baseline)
     # if alg === "lns"
     #     heuristic = LNS(sol, MHMethod[MHMethod("con", construct!)],
     #         [MHMethod("de$i", destroy!, i) for i in 1:3],
@@ -459,7 +470,7 @@ function solve_scf_pdp(alg::AbstractString="nn_det",
 end
 
 # To run from REPL, activate `MHLibDemos` environment, use `MHLibDemos`,
-# and call e.g. `solve_tsp("lns", titer=200, seed=1)`.
+# and call e.g. `solve_scfpdp("ls", titer=200, seed=1)`.
 
 # Run with profiler:
-# @profview solve_tsp(args)
+# @profview solve_scfpdp(args)

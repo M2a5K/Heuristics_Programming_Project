@@ -16,8 +16,8 @@ using TestItems
     datapath = joinpath(mhroot, "instances", "50", "train")
 end
 
-@testitem "SCF_PDP_Init" setup=[MHLibTestInit] begin
-    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+@testitem "SCFPDPInit" setup=[MHLibTestInit] begin
+    inst = SCFPDPInstance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
 
     @test inst.n == 50
     @test inst.nk == 2
@@ -52,9 +52,9 @@ end
     @test all(inst.d[i,i] == 0.0 for i in 1:size(inst.d, 1))
 end
 
-@testitem "SCF_PDP_CalcObjective" setup=[MHLibTestInit] begin
-    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
-    sol = SCF_PDP_Solution(inst)
+@testitem "SCFPDPCalcObjective" setup=[MHLibTestInit] begin
+    inst = SCFPDPInstance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol = SCFPDPSolution(inst)
 
     initialize!(sol)
     @test !sol.obj_val_valid

@@ -59,7 +59,7 @@ include("GraphColoring.jl")
 include("MISP.jl")
 include("MKP.jl")
 include("TSP.jl")
-include("SCF_PDP.jl")
+include("SCFPDP.jl")
 
 include("../test/tests.jl")
 
