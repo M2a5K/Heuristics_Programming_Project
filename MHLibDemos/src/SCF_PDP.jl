@@ -163,7 +163,7 @@ Structure:
 - `obj_val`: cached objective value.
 - `obj_val_valid`: whether the cached objective is valid.
 """
-mutable struct SCF_PDP_Solution <: PermutationSolution{Int}
+mutable struct SCF_PDP_Solution <: Solution
     inst::SCF_PDP_Instance
     routes::Vector{Vector{Int}}     # length nK
     load::Vector{Int}               # length nK
@@ -248,59 +248,72 @@ Calculates the objective value for the SCF-PDP solution.
 
 The objective consists of:
 1. Total travel time across all routes
-2. Fairness component based on the variance of travel times
+2. Fairness component based on the Jain fairness measure
 
 Returns the weighted sum: total_time + rho * variance
 """
-# TODO implement actual objective calculation (currently just returns number of routes as placeholder)
 function MHLib.calc_objective(s::SCF_PDP_Solution)
-    n = length(s.routes)
-    return n
-    # inst = s.inst
+    inst = s.inst
     
-    # # If no requests are served, return a large penalty
-    # if !any(s.served)
-    #     return Inf
-    # end
+    # If no requests are served, return a large penalty
+    if !any(s.served)
+        return Inf
+    end
     
-    # # Calculate travel time for each route
-    # route_times = Float64[]
-    # total_time = 0.0
+    # Calculate travel time for each route
+    route_times = Float64[]
+    total_time = 0.0
     
-    # for (k, route) in enumerate(s.routes)
-    #     if isempty(route)
-    #         push!(route_times, 0.0)
-    #         continue
-    #     end
+    for (k, route) in enumerate(s.routes)
+        if isempty(route)
+            push!(route_times, 0.0)
+            continue
+        end
         
-    #     # Calculate time for this route: depot -> route[1] -> ... -> route[end] -> depot
-    #     time = inst.d[inst.depot, route[1]]  # depot to first node
+        # Calculate time for this route: depot -> route[1] -> ... -> route[end] -> depot
+        time = inst.d[inst.depot, route[1]]  # depot to first node
         
-    #     for i in 1:(length(route)-1)
-    #         time += inst.d[route[i], route[i+1]]  # between consecutive nodes
-    #     end
+        for i in 1:(length(route)-1)
+            time += inst.d[route[i], route[i+1]]  # between consecutive nodes
+        end
         
-    #     time += inst.d[route[end], inst.depot]  # last node back to depot
+        time += inst.d[route[end], inst.depot]  # last node back to depot
         
-    #     push!(route_times, time)
-    #     total_time += time
-    # end
+        push!(route_times, time)
+        total_time += time
+    end
     
-    # # Calculate fairness component (variance of route times)
-    # # Only consider routes that are actually used
+    # Calculate fairness component using the Jain fairness measure
+    # TODO Do we have to exclude unused routes? According to the handout, we sum over all K, where K is the
+    # "fleet of nK identical vehicles". Is this interpreted as all vehicles, or only the used ones?
     # used_routes = filter(t -> t > 0, route_times)
+
+    fairness = (total_time ^ 2) / (length(s.routes) * sum(t^2 for t in route_times))
     
-    # if isempty(used_routes)
-    #     variance = 0.0
-    # elseif length(used_routes) == 1
-    #     variance = 0.0
-    # else
-    #     mean_time = sum(used_routes) / length(used_routes)
-    #     variance = sum((t - mean_time)^2 for t in used_routes) / length(used_routes)
-    # end
+    # Objective: minimize total time + rho * variance
+    return total_time + inst.rho * fairness
+end
+
+"""
+    initialize!(s::SCF_PDP_Solution)
+
+Initialize the solution with empty routes (all vehicles start and end at depot with no requests served).
+"""
+function MHLib.initialize!(s::SCF_PDP_Solution)
+    # Reset all routes to empty
+    for k in 1:s.inst.nk
+        empty!(s.routes[k])
+        s.load[k] = 0
+    end
     
-    # # Objective: minimize total time + rho * variance
-    # return total_time + inst.rho * variance
+    # Mark all requests as not served
+    fill!(s.served, false)
+    
+    # Set objective value to Inf (no requests served means infeasible/very poor solution)
+    s.obj_val = Inf
+    s.obj_val_valid = false
+    
+    return s
 end
 
 # """

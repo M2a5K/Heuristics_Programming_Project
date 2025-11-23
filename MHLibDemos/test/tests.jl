@@ -12,14 +12,12 @@ using TestItems
     using MHLib
     using MHLibDemos
     Random.seed!(1)
-    datapath = joinpath(@__DIR__, "..", "instances", "50", "train")
+    mhroot = dirname(dirname(pathof(MHLibDemos)))
+    datapath = joinpath(mhroot, "instances", "50", "train")
 end
 
-@testitem "Init_SCF_PDP" setup=[MHLibTestInit] begin
+@testitem "SCF_PDP_Init" setup=[MHLibTestInit] begin
     inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
-    sol = SCF_PDP_Solution(inst)
-
-    println(sol)
 
     @test inst.n == 50
     @test inst.nk == 2
@@ -37,19 +35,33 @@ end
     @test inst.dropoff == collect(52:101)
 
     @test length(inst.coords) == 101
-    @test inst.coords == Tuple{Int,Int}[(35, 35), (61, 9), (43, 25), (45, 28), (70, 31), (57, 45), (18, 2), (59, 34), (48, 30), (9, 67), (6, 66), (28, 10), (20, 11), (1, 7), (39, 18), (38, 50), (7, 60), (64, 2), (56, 61), (5, 11), (48, 16), (27, 49), (6, 62), (37, 23), (64, 39), (19, 59), (15, 29), (45, 68), (7, 36), (16, 39), (49, 13), (47, 41), (6, 64), (48, 23), (53, 49), (11, 3), (59, 34), (19, 2), (59, 13), (59, 24), (69, 64), (18, 37), (40, 11), (60, 1), (29, 67), (18, 70), (61, 13), (60, 14),
-    (27, 58), (49, 45), (57, 67), (63, 61), (3, 71), (35, 37), (27, 46), (21, 17), (37, 18), (55, 56), (34, 46), (17, 21), (16, 47), (38, 69), (39, 9), (57, 69), (56, 49), (6, 45), (69, 53), (6, 50), (32, 57), (20, 59), (55, 8), (68, 30), (15, 58), (57, 55), (4, 29),
-    (18, 31), (65, 39), (15, 12), (5, 4), (57, 42), (40, 15), (9, 37), (17, 1), (67, 4), (34, 67), (69, 24), (62, 47), (49, 6), (24, 17), (51, 54), (68, 38), (8, 56), (14, 0), (15, 70), (63, 65), (26, 44), (61, 61), (19, 5), (61, 67), (4, 15), (71, 23)]
+    @test inst.coords == Tuple{Int,Int}[
+        (35, 35), (61, 9), (43, 25), (45, 28), (70, 31), (57, 45), (18, 2), (59, 34), (48, 30), (9, 67),
+        (6, 66), (28, 10), (20, 11), (1, 7), (39, 18), (38, 50), (7, 60), (64, 2), (56, 61), (5, 11),
+        (48, 16), (27, 49), (6, 62), (37, 23), (64, 39), (19, 59), (15, 29), (45, 68), (7, 36), (16, 39),
+        (49, 13), (47, 41), (6, 64), (48, 23), (53, 49), (11, 3), (59, 34), (19, 2), (59, 13), (59, 24),
+        (69, 64), (18, 37), (40, 11), (60, 1), (29, 67), (18, 70), (61, 13), (60, 14), (27, 58), (49, 45),
+        (57, 67), (63, 61), (3, 71), (35, 37), (27, 46), (21, 17), (37, 18), (55, 56), (34, 46), (17, 21),
+        (16, 47), (38, 69), (39, 9), (57, 69), (56, 49), (6, 45), (69, 53), (6, 50), (32, 57), (20, 59),
+        (55, 8), (68, 30), (15, 58), (57, 55), (4, 29), (18, 31), (65, 39), (15, 12), (5, 4), (57, 42),
+        (40, 15), (9, 37), (17, 1), (67, 4), (34, 67), (69, 24), (62, 47), (49, 6), (24, 17), (51, 54),
+        (68, 38), (8, 56), (14, 0), (15, 70), (63, 65), (26, 44), (61, 61), (19, 5), (61, 67), (4, 15),
+        (71, 23)]
 
     @test length(inst.d) == 10201
+    @test all(inst.d[i,i] == 0.0 for i in 1:size(inst.d, 1))
+end
 
-    # TODO add test for calculating obj value
-    println(obj(sol))
-    # @test obj(sol) >= 0
-    # @test sol.obj_val_valid
-    # initialize!(sol)
-    # @test !sol.obj_val_valid
-    # println(sol)
-    # println(obj(sol))
-    # @test obj(sol) >= 0
+@testitem "SCF_PDP_CalcObjective" setup=[MHLibTestInit] begin
+    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol = SCF_PDP_Solution(inst)
+
+    initialize!(sol)
+    @test !sol.obj_val_valid
+    obj_value = obj(sol)
+    @test obj_value >= 0
+    @test sol.obj_val_valid  # calling MHLib.jl's obj method sets obj_val_valid to true
+
+    println(sol)
+    println("Objective value after calling initialize!: $obj_value")
 end
