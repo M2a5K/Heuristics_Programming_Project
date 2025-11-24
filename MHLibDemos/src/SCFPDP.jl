@@ -347,84 +347,204 @@ LocalSearchParams() = LocalSearchParams(:two_opt, :first_improvement, false)
 """
     local_improve!(s, par, result)
 
-`MHMethod` that performs local search for SCF-PDP using 2-opt moves.
+`MHMethod` that performs local search for SCF-PDP.
 
-The `par` parameter controls delta evaluation:
-- `par == 0`: No delta evaluation (full objective recalculation for each move)
-- `par != 0`: Use delta evaluation for efficient objective updates
+The `par` parameter specifies the configuration of the local search:
+- `par.neighborhood`: Symbol indicating the type of neighborhood to use (:two_opt, :three_opt)
+- `par.strategy`: Symbol indicating the improvement strategy (:first_improvement, :best_improvement)
+- `par.use_delta`: Bool indicating whether to use delta evaluation (true) or full re-evaluation (false)
 """
 function MHLib.local_improve!(s::SCFPDPSolution, par::LocalSearchParams, result::Result)
     improved = false
-    use_delta = (par != 0)
-    
+
+    if par.neighborhood == :two_opt
+        improved = local_search_2opt!(s, par)
+    elseif par.neighborhood == :three_opt
+        improved = local_search_3opt!(s, par)
+    else
+        error("Unknown neighborhood type: $(par.neighborhood)")
+    end
+
+    if improved
+        s.obj_val_valid = false  # Force recalculation to be safe
+        result.changed = true
+    end
+
+    return improved
+end
+
+"""
+    local_search_2opt!(s, par, result)
+
+Perform 2-opt local search on the SCF-PDP solution `s`.
+"""
+function local_search_2opt!(s::SCFPDPSolution, par::LocalSearchParams)
+    improved = false
+
     # Try 2-opt moves on each vehicle's route
     for k in 1:s.inst.nk
-        route = s.routes[k]
-        
-        # Need at least 3 nodes for meaningful 2-opt
-        if length(route) < 3
-            continue
+        if par.strategy == :first_improvement
+            improved = two_opt_first_improvement!(s, k, par.use_delta)
+        elseif par.strategy == :best_improvement
+            improved = two_opt_best_improvement!(s, k, par.use_delta)
         end
-        
-        # Try all pairs of edges to swap
-        for i in 1:(length(route) - 2)
-            for j in (i + 2):length(route)
-                if use_delta
-                    # Efficient delta evaluation
-                    delta = two_opt_delta_eval(s, k, i, j)
-                    
-                    if delta < -1e-6  # Improvement found
-                        # Apply the move: reverse segment
-                        reverse!(route, i + 1, j)
-                        
-                        # Check if still feasible (pickup before dropoff)
-                        if is_feasible(s)
-                            # Accept the move
-                            s.obj_val += delta
-                            improved = true
-                        else
-                            # Revert the move
-                            reverse!(route, i + 1, j)
-                        end
-                    end
-                else
-                    # Baseline: full objective recalculation
-                    old_obj = MHLib.obj(s)
-                    
+    end
+
+    return improved
+end
+
+"""
+    two_opt_first_improvement!(s, k)
+
+Perform first improvement 2-opt on route `k` of solution `s`.
+Returns true if an improving move was applied, false otherwise.
+"""
+function two_opt_first_improvement!(s::SCFPDPSolution, k::Int, use_delta::Bool)
+    route = s.routes[k]
+
+    # Need at least 3 nodes for meaningful 2-opt
+    if length(route) < 3
+        return false
+    end
+
+    # Try all pairs of edges to swap
+    for i in 1:(length(route)-2)
+        for j in (i+2):length(route)
+            if use_delta
+                # Efficient delta evaluation
+                delta = two_opt_delta_eval(s, k, i, j)
+
+                if delta < -1e-6  # Improvement found
                     # Apply the move: reverse segment
                     reverse!(route, i + 1, j)
-                    
+
                     # Check if still feasible (pickup before dropoff)
                     if is_feasible(s)
-                        # Recalculate full objective
+                        # Accept the move
+                        s.obj_val += delta
                         s.obj_val_valid = false
-                        new_obj = MHLib.obj(s)
-                        
-                        if new_obj < old_obj - 1e-6  # Improvement found
-                            # Accept the move
-                            improved = true
-                        else
-                            # Revert the move
-                            reverse!(route, i + 1, j)
-                            s.obj_val = old_obj
-                            s.obj_val_valid = true
-                        end
+                        return true # Exit after first improvement
+                    else
+                        # Revert the move
+                        reverse!(route, i + 1, j)
+                    end
+                end
+            else
+                # Baseline: full objective recalculation
+                old_obj = MHLib.obj(s)
+
+                # Apply the move: reverse segment
+                reverse!(route, i + 1, j)
+
+                # Check if still feasible (pickup before dropoff)
+                if is_feasible(s)
+                    # Recalculate full objective
+                    s.obj_val_valid = false
+                    new_obj = MHLib.obj(s)
+
+                    if new_obj < old_obj - 1e-6  # Improvement found
+                        # Accept the move
+                        return true # Exit after first improvement
                     else
                         # Revert the move
                         reverse!(route, i + 1, j)
                         s.obj_val = old_obj
                         s.obj_val_valid = true
                     end
+                else
+                    # Revert the move
+                    reverse!(route, i + 1, j)
+                    s.obj_val = old_obj
+                    s.obj_val_valid = true
                 end
             end
         end
     end
-    
-    if improved
-        s.obj_val_valid = false  # Force recalculation to be safe
-        result.changed = true
-    end
+
+    return false
 end
+
+
+"""
+    two_opt_best_improvement!(s, k)
+
+Perform best improvement 2-opt on route `k` of solution `s`.
+Returns true if an improving move was applied, false otherwise.
+"""
+function two_opt_best_improvement!(s::SCFPDPSolution, k::Int, use_delta::Bool)
+    route = s.routes[k]
+    best_move = (Inf, -1, -1) # (obj_val or delta, node1, node2)
+
+    # Need at least 3 nodes for meaningful 2-opt
+    if length(route) < 3
+        return false
+    end
+
+    # Try all pairs of edges to swap
+    for i in 1:(length(route)-2)
+        for j in (i+2):length(route)
+            if use_delta
+                # Efficient delta evaluation
+                delta = two_opt_delta_eval(s, k, i, j)
+
+                if delta < best_move[1] - 1e-6  # Improvement found
+                    # Temporarily apply the move to check feasibility
+                    reverse!(route, i + 1, j)
+
+                    # Check if still feasible (pickup before dropoff)
+                    if is_feasible(s)
+                        best_move = (delta, i, j)
+                    end
+                    
+                    # Revert the move
+                    reverse!(route, i + 1, j)
+                end
+            else
+                # Baseline: full objective recalculation
+                old_obj = MHLib.obj(s)
+
+                # Apply the move: reverse segment
+                reverse!(route, i + 1, j)
+
+                # Check if still feasible (pickup before dropoff)
+                if is_feasible(s)
+                    # Recalculate full objective
+                    s.obj_val_valid = false
+                    new_obj = MHLib.obj(s)
+
+                    if new_obj < best_move[1]
+                        best_move = (new_obj, i, j)
+                    end
+                    # Revert the move for now
+                    reverse!(route, i + 1, j)
+                    s.obj_val = old_obj
+                    s.obj_val_valid = true
+                else
+                    # Revert the move
+                    reverse!(route, i + 1, j)
+                    s.obj_val = old_obj
+                    s.obj_val_valid = true
+                end
+            end
+        end
+    end
+
+    # Apply the best move found, if any
+    if best_move[2] != -1
+        _, i_best, j_best = best_move
+        reverse!(route, i_best + 1, j_best)
+        if use_delta
+            s.obj_val += best_move[1]
+        else
+            s.obj_val = best_move[1]
+        end
+        s.obj_val_valid = false
+        return true
+    end
+
+    return false
+end
+
 
 """
     two_opt_delta_eval(s, k, i, j)
@@ -1388,8 +1508,10 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         construct_pilot!(sol)
 
     elseif alg == "ls"
-        heuristic = GVNS(sol, [MHMethod("con", construct!)],
-            [MHMethod("li1", local_improve!, LocalSearchParams(:two_opt,:first_improvement,false))], MHMethod[];
+        heuristic = GVNS(sol,
+            [MHMethod("con", construct!)],
+            [MHMethod("li1", local_improve!, LocalSearchParams(:two_opt, :first_improvement, false))],
+            MHMethod[];
             consider_initial_sol=true, titer, kwargs...)
         run!(heuristic)
         method_statistics(heuristic.scheduler)
