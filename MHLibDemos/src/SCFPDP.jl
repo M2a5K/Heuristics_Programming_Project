@@ -551,7 +551,7 @@ end
 
 Calculate the change in objective value if we reverse the segment [i+1, j] in route k.
 
-For 2-opt in VRP, we replace edges:
+For 2-opt, we replace edges:
 - (route[i], route[i+1]) and (route[j], route[j+1])
 with:
 - (route[i], route[j]) and (route[i+1], route[j+1])
@@ -567,6 +567,8 @@ function two_opt_delta_eval(s::SCFPDPSolution, k::Int, i::Int, j::Int)
     node_i_next = route[i + 1]
     node_j = route[j]
     node_j_next = (j == length(route)) ? inst.depot : route[j + 1]
+    
+    # TODO fix calculation of delta: fairness is missing!
     
     # Old edges
     old_dist = inst.d[node_i, node_i_next] + inst.d[node_j, node_j_next]
