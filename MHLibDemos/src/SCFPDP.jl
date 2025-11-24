@@ -326,6 +326,24 @@ function MHLib.construct!(s::SCFPDPSolution, ::Nothing, result::Result)
     result.changed = true
 end
 
+
+"""
+    LocalSearchParams
+Parameters for local search methods in SCF-PDP.
+    - `neighborhood`: Symbol indicating the type of neighborhood to use (:two_opt, :three_opt)
+    - `strategy`: Symbol indicating the improvement strategy (:first_improvement, :best_improvement)
+    - `use_delta`: Bool indicating whether to use delta evaluation (true) or full re-evaluation (false)
+"""
+struct LocalSearchParams
+    neighborhood::Symbol  # :two_opt, :three_opt
+    strategy::Symbol      # :first_improvement, :best_improvement
+    use_delta::Bool       # true for delta evaluation, false for full re-evaluation
+end
+
+# Default constructor for backward compatibility
+LocalSearchParams() = LocalSearchParams(:two_opt, :first_improvement, false)
+
+
 """
     local_improve!(s, par, result)
 
@@ -335,7 +353,7 @@ The `par` parameter controls delta evaluation:
 - `par == 0`: No delta evaluation (full objective recalculation for each move)
 - `par != 0`: Use delta evaluation for efficient objective updates
 """
-function MHLib.local_improve!(s::SCFPDPSolution, par::Any, result::Result)
+function MHLib.local_improve!(s::SCFPDPSolution, par::LocalSearchParams, result::Result)
     improved = false
     use_delta = (par != 0)
     
@@ -639,6 +657,7 @@ function is_feasible(s::SCFPDPSolution)
 
         for node in route
             r, is_pickup = node_to_request(inst, node)
+            # TODO this check might be unnecessary, because we don't store the depot in a route
             if r == 0
                 continue  # depot should not appear inside routes
             end
@@ -1370,7 +1389,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
 
     elseif alg == "ls"
         heuristic = GVNS(sol, [MHMethod("con", construct!)],
-            [MHMethod("li1", local_improve!, 0)], MHMethod[];
+            [MHMethod("li1", local_improve!, LocalSearchParams(:two_opt,:first_improvement,false))], MHMethod[];
             consider_initial_sol=true, titer, kwargs...)
         run!(heuristic)
         method_statistics(heuristic.scheduler)
