@@ -316,23 +316,128 @@ function MHLib.initialize!(s::SCFPDPSolution)
     return s
 end
 
-# """
-#     construct!(tsp_solution, ::Nothing, result)
+"""
+    construct!(s, ::Nothing, result)
 
-# `MHMethod` that constructs a new solution by random initialization.
-# """
-# MHLib.construct!(s::TSPSolution, ::Nothing, result::Result) = initialize!(s)
+`MHMethod` that constructs a new solution by deterministic nearest neighbor construction.
+"""
+function MHLib.construct!(s::SCFPDPSolution, ::Nothing, result::Result)
+    construct_nn_det!(s)
+    result.changed = true
+end
 
-# """
-#     local_improve!(tsp_solution, ::Any, result)
+"""
+    local_improve!(s, par, result)
 
-# `MHMethod` that performs two-opt local search.
-# """
-# function MHLib.local_improve!(s::TSPSolution, ::Any, result::Result)
-#     if !two_opt_neighborhood_search!(s, false)
-#         result.changed = false
-#     end
-# end
+`MHMethod` that performs local search for SCF-PDP using 2-opt moves.
+
+The `par` parameter controls delta evaluation:
+- `par == 0`: No delta evaluation (full objective recalculation for each move)
+- `par != 0`: Use delta evaluation for efficient objective updates
+"""
+function MHLib.local_improve!(s::SCFPDPSolution, par::Any, result::Result)
+    improved = false
+    use_delta = (par != 0)
+    
+    # Try 2-opt moves on each vehicle's route
+    for k in 1:s.inst.nk
+        route = s.routes[k]
+        
+        # Need at least 3 nodes for meaningful 2-opt
+        if length(route) < 3
+            continue
+        end
+        
+        # Try all pairs of edges to swap
+        for i in 1:(length(route) - 2)
+            for j in (i + 2):length(route)
+                if use_delta
+                    # Efficient delta evaluation
+                    delta = two_opt_delta_eval(s, k, i, j)
+                    
+                    if delta < -1e-6  # Improvement found
+                        # Apply the move: reverse segment
+                        reverse!(route, i + 1, j)
+                        
+                        # Check if still feasible (pickup before dropoff)
+                        if is_feasible(s)
+                            # Accept the move
+                            s.obj_val += delta
+                            improved = true
+                        else
+                            # Revert the move
+                            reverse!(route, i + 1, j)
+                        end
+                    end
+                else
+                    # Baseline: full objective recalculation
+                    old_obj = MHLib.obj(s)
+                    
+                    # Apply the move: reverse segment
+                    reverse!(route, i + 1, j)
+                    
+                    # Check if still feasible (pickup before dropoff)
+                    if is_feasible(s)
+                        # Recalculate full objective
+                        s.obj_val_valid = false
+                        new_obj = MHLib.obj(s)
+                        
+                        if new_obj < old_obj - 1e-6  # Improvement found
+                            # Accept the move
+                            improved = true
+                        else
+                            # Revert the move
+                            reverse!(route, i + 1, j)
+                            s.obj_val = old_obj
+                            s.obj_val_valid = true
+                        end
+                    else
+                        # Revert the move
+                        reverse!(route, i + 1, j)
+                        s.obj_val = old_obj
+                        s.obj_val_valid = true
+                    end
+                end
+            end
+        end
+    end
+    
+    if improved
+        s.obj_val_valid = false  # Force recalculation to be safe
+        result.changed = true
+    end
+end
+
+"""
+    two_opt_delta_eval(s, k, i, j)
+
+Calculate the change in objective value if we reverse the segment [i+1, j] in route k.
+
+For 2-opt in VRP, we replace edges:
+- (route[i], route[i+1]) and (route[j], route[j+1])
+with:
+- (route[i], route[j]) and (route[i+1], route[j+1])
+
+This effectively reverses the segment between i+1 and j.
+"""
+function two_opt_delta_eval(s::SCFPDPSolution, k::Int, i::Int, j::Int)
+    inst = s.inst
+    route = s.routes[k]
+    
+    # Get the four nodes involved
+    node_i = (i == 0) ? inst.depot : route[i]
+    node_i_next = route[i + 1]
+    node_j = route[j]
+    node_j_next = (j == length(route)) ? inst.depot : route[j + 1]
+    
+    # Old edges
+    old_dist = inst.d[node_i, node_i_next] + inst.d[node_j, node_j_next]
+    
+    # New edges (after reversing segment [i+1, j])
+    new_dist = inst.d[node_i, node_j] + inst.d[node_i_next, node_j_next]
+    
+    return new_dist - old_dist
+end
 
 # """
 #     shaking!(tsp_solution, par, result)
@@ -1264,7 +1369,13 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         construct_pilot!(sol)
 
     elseif alg == "ls"
-        error("Algorithm 'ls' not yet implemented.")
+        heuristic = GVNS(sol, [MHMethod("con", construct!)],
+            [MHMethod("li1", local_improve!, 0)], MHMethod[];
+            consider_initial_sol=true, titer, kwargs...)
+        run!(heuristic)
+        method_statistics(heuristic.scheduler)
+        main_results(heuristic.scheduler)
+        copy!(sol, heuristic.scheduler.incumbent)
 
     elseif alg == "vnd"
         error("Algorithm 'vnd' not yet implemented.")
@@ -1279,23 +1390,6 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
     println(sol)
     println("Feasible? ", is_feasible(sol))
 
-    # TODO this has not been adapted to SCFPDP yet (still TSP baseline)
-    # if alg === "lns"
-    #     heuristic = LNS(sol, MHMethod[MHMethod("con", construct!)],
-    #         [MHMethod("de$i", destroy!, i) for i in 1:3],
-    #         [MHMethod("re", repair!)]; 
-    #         consider_initial_sol=true, titer, kwargs...)
-    # elseif alg === "gvns"
-    #     heuristic = GVNS(sol, [MHMethod("con", construct!)],
-    #         [MHMethod("li1", local_improve!, 1)], [MHMethod("sh1", shaking!, 1)];
-    #         consider_initial_sol=true, titer, kwargs...)
-    # else
-    #     error("Invalid parameter alg: $alg")
-    # end
-    # run!(heuristic)
-    # method_statistics(heuristic.scheduler)
-    # main_results(heuristic.scheduler)
-    # check(sol)
     return sol
 end
 
