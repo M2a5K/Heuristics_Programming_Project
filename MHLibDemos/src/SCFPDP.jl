@@ -298,10 +298,8 @@ struct LocalSearchParams
     use_delta::Bool       # true for delta evaluation, false for full re-evaluation
 end
 
-# Default constructor for backward compatibility
-LocalSearchParams() = LocalSearchParams(:two_opt, :first_improvement, false)
-
-# Keyword constructor (for easier execuation of different parameter configurations in REPL)
+# Keyword constructor with defaults (for easier execution of different parameter configurations in REPL;
+# also serves as a default constructor in case no arguments are passed)
 LocalSearchParams(; neighborhood=:two_opt, strategy=:first_improvement, use_delta=false) =
     LocalSearchParams(neighborhood, strategy, use_delta)
 
