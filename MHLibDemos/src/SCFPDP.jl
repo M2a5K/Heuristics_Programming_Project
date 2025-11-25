@@ -280,7 +280,7 @@ end
 `MHMethod` that constructs a new solution by deterministic nearest neighbor construction.
 """
 function MHLib.construct!(s::SCFPDPSolution, ::Nothing, result::Result)
-    construct_nn_rand!(s)
+    construct_nn_det!(s)
     result.changed = true
 end
 
@@ -552,7 +552,7 @@ Returns true if an improving move was applied, false otherwise.
 function local_search_inter_route!(s::SCFPDPSolution, par::LocalSearchParams)
     improved = false
 
-    # Try inter-route moves between all pairs of vehicles
+    # Try inter-route swaps between all pairs of vehicles
     for k1 in 1:(s.inst.nk - 1)
         for k2 in (k1 + 1):s.inst.nk
             if par.strategy == :first_improvement
@@ -567,7 +567,7 @@ function local_search_inter_route!(s::SCFPDPSolution, par::LocalSearchParams)
 end
 
 """
-    inter_route_first_improvement!(s, k1, k2)
+    inter_route_first_improvement!(s, k1, k2, use_delta)
 
 Perform first improvement inter-route swapping of two requests between vehicles `k1` and `k2` of solution `s`.
 Returns true if an improving move was applied, false otherwise.
@@ -613,12 +613,14 @@ function inter_route_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use
                             # Revert the swap
                             route1[i1], route2[i2] = route2[i2], route1[i1]
                             route1[idx_dropoff1], route2[idx_dropoff2] = route2[idx_dropoff2], route1[idx_dropoff1]
+                            s.obj_val = old_obj
                             s.obj_val_valid = true
                         end
                     else
                         # Revert the swap
                         route1[i1], route2[i2] = route2[i2], route1[i1]
                         route1[idx_dropoff1], route2[idx_dropoff2] = route2[idx_dropoff2], route1[idx_dropoff1]
+                        s.obj_val = old_obj
                         s.obj_val_valid = true
                     end
                 end
@@ -630,7 +632,7 @@ function inter_route_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use
 end
 
 """
-    inter_route_best_improvement!(s, k1, k2)
+    inter_route_best_improvement!(s, k1, k2, use_delta)
 
 Perform best improvement inter-route swapping of two requests between vehicles `k1` and `k2` of solution `s`.
 Returns true if an improving move was applied, false otherwise.
