@@ -607,53 +607,7 @@ end
 # """
 # MHLib.repair!(s::TSPSolution, ::Nothing, ::Result) = greedy_reinsert_removed!(s)
 
-# """
-#     insert_val_at_best_pos!(tsp_solution, val)
 
-# Inserts `val` greedily at the best position.
-# The solution's objective value is assumed to be valid and is incrementally updated.
-# """
-# function MHLib.insert_val_at_best_pos!(s::TSPSolution, val::Int)
-#     x = s.x
-#     d = s.inst.d
-#     best_pos = length(x) + 1
-#     δ_best = δ = d[val, x[end]] + d[val, x[1]] - d[x[1], x[end]]
-#     for i in 2:length(s.x)
-#         δ = d[val, x[i-1]] + d[val, x[i]] - d[x[i-1], x[i]]       
-#         if δ < δ_best 
-#             δ_best = δ
-#             best_pos = i
-#         end
-#     end
-#     insert!(s.x, best_pos, val)
-#     s.obj_val = s.obj_val + δ_best
-# end
-
-# """
-#     two_opt_move_delta_eval(permutation_solution, p1, p2)
-
-# Return efficiently the delta in the objective value when 2-opt move would be applied.
-# """
-# function MHLib.two_opt_move_delta_eval(s::TSPSolution, p1::Integer, 
-#         p2::Integer)
-#     @assert 1 <= p1 < p2 <= length(s)
-#     if p1 == 1 && p2 == length(s)
-#         # reversing the whole solution has no effect
-#         return 0
-#     end
-#     prev = mod1(p1 - 1, length(s))
-#     nxt = mod1(p2 + 1, length(s))
-
-#     x_p1 = s.x[p1]
-#     x_p2 = s.x[p2]
-#     x_prev = s.x[prev]
-#     x_next = s.x[nxt]
-#     delta = s.inst.d[x_prev,x_p2] + s.inst.d[x_p1,x_next] - s.inst.d[x_prev,x_p1] - 
-#         s.inst.d[x_p2,x_next]
-# end
-
-
-# # -------------------------------------------------------------------------------
 
 
 # HELPER FUNCTIONS 
@@ -1059,413 +1013,6 @@ end
 
 
 
-
-
-
-# # HELPER FUNCTIONS 
-# """
-# node_to_request(inst, node) -> (r, is_pickup)
-
-# Map a node index to the corresponding request index and a flag that
-# tells you whether it is a pickup node.
-
-# Returns:
-# - `(r, true)`  if `node` is the pickup of request `r`
-# - `(r, false)` if `node` is the dropoff of request `r`
-# - `(0, true)`  if `node` is the depot (no request)
-# """
-# function node_to_request(inst::SCFPDPInstance, node::Int)
-#     if node == inst.depot
-#         return 0, true
-#     elseif 2 <= node <= inst.n + 1
-#         # pickups are 2..(n+1)
-#         return node - 1, true
-#     elseif (inst.n + 2) <= node <= (2 * inst.n + 1)
-#         # dropoffs are (n+2)..(2n+1)
-#         return node - (inst.n + 1), false
-#     else
-#         error("node_to_request: node $node out of range")
-#     end
-# end
-
-
-# """
-# route_time(inst, route) -> Int
-
-# Compute the total travel time of a single route, including:
-# - from depot to the first node (if any),
-# - between all consecutive nodes,
-# - from the last node back to the depot.
-
-# If the route is empty, the time is 0.
-# """
-# function route_time(inst::SCFPDPInstance, route::Vector{Int})
-#     if isempty(route)
-#         return 0
-#     end
-
-#     t = 0
-#     # depot to first
-#     t += inst.d[inst.depot, route[1]]
-
-#     # between customers
-#     for i in 1:(length(route) - 1)
-#         t += inst.d[route[i], route[i+1]]
-#     end
-
-#     # last to depot
-#     t += inst.d[route[end], inst.depot]
-
-#     return t
-# end
-
-
-# """
-# extra_cost_if_append(inst, route, r) -> Int
-
-# Compute how much the travel time of `route` increases if we append
-# request `r` at the end as [pickup(r), dropoff(r)].
-
-# This simple version just recomputes the route time before and after.
-# """
-# function extra_cost_if_append(inst::SCFPDPInstance,
-#                               route::Vector{Int},
-#                               r::Int)
-#     p = inst.pickup[r]
-#     q = inst.dropoff[r]
-
-#     old_time = route_time(inst, route)
-
-#     # temporarily extended route
-#     tmp = copy(route)
-#     push!(tmp, p)
-#     push!(tmp, q)
-
-#     new_time = route_time(inst, tmp)
-#     return new_time - old_time
-# end
-
-
-# """
-# append_request!(s, k, r)
-
-# Append request `r` at the end of vehicle `k`'s route as
-# [pickup(r), dropoff(r)] and update `served`.
-
-# We *do not* touch `s.obj_val` here – that is done by `calc_objective`.
-# """
-# function append_request!(s::SCFPDPSolution, k::Int, r::Int)
-#     inst = s.inst
-#     push!(s.routes[k], inst.pickup[r])
-#     push!(s.routes[k], inst.dropoff[r])
-#     s.served[r] = true
-#     return s
-# end
-
-
-# """
-# is_feasible(s) -> Bool
-
-# Check basic feasibility of a solution:
-
-# 1. Capacity constraints:
-#    - the load never exceeds vehicle capacity
-#    - the load never becomes negative
-# 2. Precedence:
-#    - dropoff of request r cannot appear before its pickup
-
-# We recompute the load along each route from scratch.
-# """
-# function is_feasible(s::SCFPDPSolution)
-#     inst = s.inst
-
-#     for route in s.routes
-#         load = 0
-#         seen_pickup = falses(inst.n)  
-
-#         for node in route
-#             r, is_pickup = node_to_request(inst, node)
-#             if r == 0
-#                 continue  # depot should not appear inside routes
-#             end
-
-#             if is_pickup
-#                 load += inst.c[r]
-#                 seen_pickup[r] = true
-#             else
-#                 # dropoff must come after pickup
-#                 if !seen_pickup[r]
-#                     return false
-#                 end
-#                 load -= inst.c[r]
-#             end
-
-#             if load < 0 || load > inst.C
-#                 return false
-#             end
-#         end
-#     end
-
-#     return true
-# end
-
-
-
-# """
-#     construct_nn_det!(s)
-
-# Deterministic greedy construction heuristic for SCF-PDP.
-
-# Starting from an empty solution, it repeatedly chooses the request/vehicle
-# pair (r, k) that yields the smallest increase in total travel time when
-# request r is appended at the end of vehicle k's route as
-# [pickup(r), dropoff(r)], subject to feasibility (capacity + precedence).
-
-# The process stops when either:
-# - `gamma` requests have been served, or
-# - no further feasible insertion can be found.
-# """
-# function construct_nn_det!(s::SCFPDPSolution)
-#     inst = s.inst
-#     # empty solution
-#     initialize!(s)
-
-#     # all requests initially available
-#     remaining = collect(1:inst.n)
-
-#     while count(s.served) < inst.gamma && !isempty(remaining)
-#         best_r   = 0
-#         best_k   = 0
-#         best_Δ   = Inf
-
-#         # Try to insert each remaining request into each vehicle
-#         for r in remaining
-#             for k in 1:inst.nk
-#                 # check cost increase if we appended r to route k
-#                 Δ = extra_cost_if_append(inst, s.routes[k], r)
-
-#                 # apply the insertion and test feasibility
-#                 tmp = copy(s)
-#                 append_request!(tmp, k, r)
-
-#                 if is_feasible(tmp) && Δ < best_Δ
-#                     best_Δ = Δ
-#                     best_r = r
-#                     best_k = k
-#                 end
-#             end
-#         end
-
-#         if best_r == 0
-#             break
-#         end
-
-#         # Commit the best insertion to the real solution
-#         append_request!(s, best_k, best_r)
-#         deleteat!(remaining, findfirst(==(best_r), remaining))
-#     end
-
-#     # comp objective
-#     s.obj_val = MHLib.calc_objective(s)
-#     s.obj_val_valid = true
-#     return s
-# end
-
-
-# """
-#     construct_nn_rand!(s; alpha=0.3)
-
-# Randomized greedy construction heuristic for SCF-PDP.
-
-# This is a GRASP-style variant of the deterministic nearest-neighbor construction.
-# At each step, we build a candidate list (CL) of all feasible request–vehicle pairs,
-# evaluate their marginal cost Δ(k,r), and derive a Restricted Candidate List (RCL)
-# containing only sufficiently good candidates. One element of the RCL is then chosen
-# uniformly at random and applied.
-
-# The parameter `alpha ∈ [0,1]` controls the level of randomization:
-# - `alpha = 0` reproduces the purely greedy construction.
-# - `alpha = 1` allows any feasible insertion to be chosen.
-# """
-# function construct_nn_rand!(s::SCFPDPSolution; alpha::Float64 = 0.3)
-#     inst = s.inst
-#     initialize!(s)
-
-#     remaining = collect(1:inst.n)
-
-#     while count(s.served) < inst.gamma && !isempty(remaining)
-#         # andidate list 
-#         # each element Δ, r, k
-#         candidates = Tuple{Float64,Int,Int}[]
-
-#         for r in remaining
-#             for k in 1:inst.nk
-#                 # extra cost if we append r to route k
-#                 Δ = extra_cost_if_append(inst, s.routes[k], r)
-
-#                 # insert to check feasibility
-#                 tmp = copy(s)
-#                 append_request!(tmp, k, r)
-
-#                 if is_feasible(tmp)
-#                     push!(candidates, (Δ, r, k))
-#                 end
-#             end
-#         end
-
-#         isempty(candidates) && break
-
-#         # parameters for our formula 
-#         Δ_min = minimum(c[1] for c in candidates)
-#         Δ_max = maximum(c[1] for c in candidates)
-
-#         # lectre notes formula , alpha can be dtermined by user
-#         # RCL = { (Δ,r,k) in CL | Δ <= Δ_min + alpha*(Δ_max - Δ_min) }
-#         thresh = Δ_min + alpha * (Δ_max - Δ_min)
-#         rcl = [(Δ, r, k) for (Δ, r, k) in candidates if Δ <= thresh]
-
-#         # safety: if alpha is tiny and RCL gets empty, fall back to all candidates
-#         isempty(rcl) && (rcl = candidates)
-
-#         # random selection from RCL
-#         chosen = rand(rcl)
-#         _, r_star, k_star = chosen
-
-#         # apply the chosen insertion to the real solution
-#         append_request!(s, k_star, r_star)
-#         deleteat!(remaining, findfirst(==(r_star), remaining))
-#     end
-
-#     # finalize objective
-#     s.obj_val = MHLib.calc_objective(s)
-#     s.obj_val_valid = true
-#     return s
-# end
-
-# # do the same but over multipl iters and return best 
-# function multistart_randomized_construction(inst; alpha=0.3, iters=50)
-#     best = nothing
-#     best_val = Inf
-
-#     for _ in 1:iters
-#         s = SCFPDPSolution(inst)
-#         construct_nn_rand!(s; alpha)
-
-#         if s.obj_val < best_val
-#             best = copy(s)
-#             best_val = s.obj_val
-#         end
-#     end
-
-#     return best
-# end
-
-
-
-# """
-#     greedy_complete!(s)
-
-# Greedy completion of a partial SCF-PDP solution.
-
-# Starting from the current `s` (with some requests already served), this function
-# repeatedly inserts the feasible request–vehicle pair with the smallest marginal
-# increase in route time, until `γ` requests are served or no feasible insertion
-# remains. This is essentially the deterministic NN construction, but starting
-# from a non-empty solution.
-# """
-# function greedy_complete!(s::SCFPDPSolution)
-#     inst = s.inst
-#     remaining = findall(!, s.served)  # requests not yet served
-
-#     while count(s.served) < inst.gamma && !isempty(remaining)
-#         best_Δ = Inf
-#         best_r = 0
-#         best_k = 0
-
-#         for r in remaining
-#             for k in 1:inst.nk
-#                 Δ = extra_cost_if_append(inst, s.routes[k], r)
-
-#                 tmp = copy(s)
-#                 append_request!(tmp, k, r)
-
-#                 if is_feasible(tmp) && Δ < best_Δ
-#                     best_Δ = Δ
-#                     best_r = r
-#                     best_k = k
-#                 end
-#             end
-#         end
-
-# +        best_r == 0 && break
-
-#         append_request!(s, best_k, best_r)
-#         deleteat!(remaining, findfirst(==(best_r), remaining))
-#     end
-
-#     s.obj_val = MHLib.calc_objective(s)
-#     s.obj_val_valid = true
-#     return s
-# end
-
-
-# """
-#     construct_pilot!(s; iters_per_step=1)
-
-# Pilot construction heuristic for SCF-PDP.
-
-# At each step, for every feasible request–vehicle insertion (k,r), we simulate the
-# completion of the partial solution with a greedy heuristic (`greedy_complete!`)
-# and select the insertion whose completed solution has the best objective value.
-# """
-# function construct_pilot!(s::SCFPDPSolution)
-#     inst = s.inst
-#     initialize!(s)
-
-#     remaining = collect(1:inst.n)
-
-#     while count(s.served) < inst.gamma && !isempty(remaining)
-#         best_val = Inf
-#         best_r   = 0
-#         best_k   = 0
-
-#         for r in remaining
-#             for k in 1:inst.nk
-#                 # insert
-#                 tmp = copy(s)
-#                 append_request!(tmp, k, r)
-
-#                 # must be feasible before completion
-#                 is_feasible(tmp) || continue
-
-#                 # complete greedily from here
-#                 greedy_complete!(tmp)
-
-#                 if tmp.obj_val < best_val
-#                     best_val = tmp.obj_val
-#                     best_r   = r
-#                     best_k   = k
-#                 end
-#             end
-#         end
-
-#         best_r == 0 && break
-
-#         # commit the best pilot move
-#         append_request!(s, best_k, best_r)
-#         deleteat!(remaining, findfirst(==(best_r), remaining))
-#     end
-
-#     s.obj_val = MHLib.calc_objective(s)
-#     s.obj_val_valid = true
-#     return s
-# end
-
-
-
-
-
-
 """
     solve_scfpdp(alg::AbstractString, filename::AbstractString; seed=nothing, titer=1000, 
         kwargs...)
@@ -1479,11 +1026,21 @@ Solve a given SCFPDP instance with the algorithm `alg`.
 - `titer`: Number of iterations for the solving algorithm, gets a new default value
 - `kwargs`: Additional configuration parameters passed to the algorithm, e.g., `ttime`
 """
-function solve_scfpdp(alg::AbstractString = "nn_det",
-        filename::AbstractString = joinpath(dirname(dirname(pathof(MHLibDemos))),
-                                            "instances", "50", "train",
-                                            "instance1_nreq50_nveh2_gamma50.txt");
-        seed = nothing, titer = 1000, kwargs...)
+# function solve_scfpdp(alg::AbstractString = "nn_det",
+#         filename::AbstractString = joinpath(dirname(dirname(pathof(MHLibDemos))),
+#                                             "instances", "50", "train",
+#                                             "instance1_nreq50_nveh2_gamma50.txt");
+#         seed = nothing, titer = 1000, kwargs...)
+function solve_scfpdp(alg::AbstractString = "nn_det";
+                      filename::AbstractString = "",
+                      seed = nothing,
+                      titer::Int = 1000,
+                      kwargs...)
+
+    # require filename when using this helper
+    if filename == ""
+        error("solve_scfpdp: keyword `filename` must be provided")
+    end
 
     isnothing(seed) && (seed = rand(0:typemax(Int32)))
     Random.seed!(seed)
@@ -1492,7 +1049,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
     println("alg=$alg, filename=$filename, seed=$seed, ", (; kwargs...))
 
     inst = SCFPDPInstance(filename)
-    sol  = SCFPDPSolution(inst)   
+    sol  = SCFPDPSolution(inst)
 
     if alg == "nn_det"
         construct_nn_det!(sol)
@@ -1510,11 +1067,16 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         construct_pilot!(sol)
 
     elseif alg == "ls"
-        heuristic = GVNS(sol,
+        heuristic = GVNS(
+            sol,
             [MHMethod("con", construct!)],
-            [MHMethod("li1", local_improve!, LocalSearchParams(:two_opt, :first_improvement, false))],
+            [MHMethod("li1", local_improve!,
+                      LocalSearchParams(:two_opt, :first_improvement, false))],
             MHMethod[];
-            consider_initial_sol=true, titer, kwargs...)
+            consider_initial_sol = true,
+            titer = titer,
+            kwargs...,
+        )
         run!(heuristic)
         method_statistics(heuristic.scheduler)
         main_results(heuristic.scheduler)
@@ -1524,7 +1086,38 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         error("Algorithm 'vnd' not yet implemented.")
 
     elseif alg == "grasp"
-        error("Algorithm 'grasp' not yet implemented.")
+        niters = get(kwargs, :niters, 50)   # how many GRASP iterations
+        alpha  = get(kwargs, :alpha, 0.3)   # same alpha as in construct_nn_rand!
+
+        # Local search parameters
+        ls_par = LocalSearchParams(:two_opt, :first_improvement, false)
+
+        best_sol = nothing
+        best_val = Inf
+
+        for it in 1:niters
+            s_it = SCFPDPSolution(inst)
+            construct_nn_rand!(s_it; alpha = alpha)
+
+            res = Result()
+            res.changed = true
+            while res.changed
+                res.changed = false
+                local_improve!(s_it, ls_par, res)
+            end
+
+            val = MHLib.obj(s_it)
+            if val < best_val
+                best_val = val
+                best_sol = copy(s_it)
+            end
+        end
+
+        if best_sol === nothing
+            error("GRASP failed to generate any solution")
+        end
+
+        copy!(sol, best_sol)
 
     else
         error("Algorithm '$alg' not yet implemented.")
@@ -1535,6 +1128,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
 
     return sol
 end
+
 
 # To run from REPL, activate `MHLibDemos` environment, use `MHLibDemos`,
 # and call e.g. `solve_scfpdp("ls", titer=200, seed=1)`.

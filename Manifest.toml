@@ -2,7 +2,7 @@
 
 julia_version = "1.12.1"
 manifest_format = "2.0"
-project_hash = "14cf8606fdc5fd301bd53446f160fa8115882cad"
+project_hash = "8c026f7475b85fa6976a02b260b8f966ed941095"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -436,6 +436,11 @@ git-tree-sha1 = "50c11ffab2a3d50192a228c313f05b5b5dc5acb2"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
 version = "2.86.0+0"
 
+[[deps.Glob]]
+git-tree-sha1 = "97285bbd5230dd766e9ef6749b80fc617126d496"
+uuid = "c27321d9-0574-5035-807b-f59d2c89b15c"
+version = "1.3.1"
+
 [[deps.Graphite2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "8a6dbda1fd736d60cc477d99f2e7a042acfa46e8"
@@ -730,13 +735,13 @@ uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.2.0"
 
 [[deps.MHLib]]
-deps = ["CSV", "DataFrames", "DataStructures", "Logging", "MHLibDemos", "Printf", "Random", "StatsBase", "TestItems"]
+deps = ["CSV", "DataFrames", "DataStructures", "Glob", "Logging", "MHLibDemos", "Printf", "Random", "StatsBase", "StatsPlots", "TestItems"]
 path = "."
 uuid = "0f3a0e6e-e0e7-4894-bd64-856f0ae3b635"
 version = "0.3.1"
 
 [[deps.MHLibDemos]]
-deps = ["Graphs", "MHLib", "Random", "StatsBase", "TestItems"]
+deps = ["CSV", "DataFrames", "Glob", "Graphs", "MHLib", "Random", "StatsBase", "TestItems"]
 path = "MHLibDemos"
 uuid = "684acab6-7f56-4bd3-8ecb-3989322bafbb"
 version = "0.3.1"
