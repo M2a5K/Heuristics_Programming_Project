@@ -53,32 +53,6 @@ struct SCFPDPInstance
 end
 
 
-# TODO remove this function
-# """
-#     SCFPDPInstance(coords, c, gamma, nk, C, rho)
-
-# Create a SCFPDP instance from given Euclidean coordinates and other parameters specific to the problem.
-# """
-# function SCFPDPInstance(coords::Vector{Tuple{Int,Int}},
-#     c::Vector{Int}, gamma::Int, nk::Int, C::Int, rho::Float64)
-
-#     n = length(c)
-#     @assert length(coords) == length(c) * 2 + 1
-#     d = Matrix{Int}(undef, n+1, n+1)
-#     for i in 1:(n+1) # also count the depot
-#         for j in i:n
-#             p = coords[i]; q = coords[j]
-#              if i == j
-#                  d[i,j] = 0
-#              else
-#                  d[i,j] = d[j,i] = round(Int, sqrt((p[1] - q[1])^2 + (p[2] - q[2])^2))
-#              end
-#         end
-#     end
-#     return SCFPDPInstance(n, c, gamma, nk, C, rho, d, coords_depot,
-#         coords_pickup, coords_dropoff)
-# end
-
 """
     SCFPDPInstance(file_name)
 
@@ -133,23 +107,6 @@ function SCFPDPInstance(file_name::AbstractString)
     end
 end
 
-# """
-#     TSPInstance(n, dims::Vector=[100, 100])
-
-# Create a random Euclidean TSP instance with `n` nodes.
-
-# The nodes lie in the integer grid `[0, xdim-1] x [0, ydim-1]`.
-# """
-# function TSPInstance(n::Int=50, dims::Vector=[100, 100])
-#     @assert length(dims) == 2
-#     coords = [trunc.(Int, rand(2) .* dims) for _ in 1:n]
-#     TSPInstance(coords)
-# end
-
-# function Base.show(io::IO, inst::TSPInstance)
-#     println(io, "n=$(inst.n), d=$(inst.d)")
-# end
-
 
 """
     SCFPDPSolution
@@ -187,8 +144,6 @@ end
 "SCFPDPSolution is minimization."
 MHLib.to_maximize(::SCFPDPSolution) = false
 
-# SCFPDPSolution(inst::SCFPDPInstance) =
-#     SCFPDPSolution(inst, Vector{Int}[collect(1:inst.nk)], collect(1:inst.nk), Vector{Bool}(undef, inst.n), Inf, false)
 
 """
     copy!(s1, s2)
@@ -222,9 +177,6 @@ function Base.copy(s::SCFPDPSolution)
     )
 end
 
-# Base.copy(s::TSPSolution) =
-#     TSPSolution(s.inst, s.obj_val, s.obj_val_valid, copy(s.x), 
-#         (isnothing(s.destroyed) ? nothing : copy(s.destroyed)))
 
 """
     Base.show(io, s)
@@ -284,11 +236,17 @@ function MHLib.calc_objective(s::SCFPDPSolution)
     end
     
     # Calculate fairness component using the Jain fairness measure
-    # TODO Do we have to exclude unused routes? According to the handout, we sum over all K, where K is the
-    # "fleet of nK identical vehicles". Is this interpreted as all vehicles, or only the used ones?
-    # used_routes = filter(t -> t > 0, route_times)
 
-    fairness = (total_time ^ 2) / (length(s.routes) * sum(t^2 for t in route_times))
+    # Only consider used routes (non-zero times) for fairness calculation to be correct.
+    # According to the handout, we sum over all K, where K is the "fleet of nK identical vehicles".
+    # We interpret this as all the vehicles that are actually being used.
+    used_routes = filter(t -> t > 0, route_times)
+    
+    if isempty(used_routes)
+        fairness = 0.0
+    else
+        fairness = (total_time ^ 2) / (length(used_routes) * sum(t^2 for t in used_routes))
+    end
     
     # Objective: minimize total time + rho * variance
     return total_time + inst.rho * (1 - fairness)
@@ -322,7 +280,7 @@ end
 `MHMethod` that constructs a new solution by deterministic nearest neighbor construction.
 """
 function MHLib.construct!(s::SCFPDPSolution, ::Nothing, result::Result)
-    construct_nn_det!(s)
+    construct_nn_rand!(s)
     result.changed = true
 end
 
@@ -330,12 +288,12 @@ end
 """
     LocalSearchParams
 Parameters for local search methods in SCF-PDP.
-    - `neighborhood`: Symbol indicating the type of neighborhood to use (:two_opt, :three_opt)
+    - `neighborhood`: Symbol indicating the type of neighborhood to use (:two_opt, :three_opt, :inter_route)
     - `strategy`: Symbol indicating the improvement strategy (:first_improvement, :best_improvement)
     - `use_delta`: Bool indicating whether to use delta evaluation (true) or full re-evaluation (false)
 """
 struct LocalSearchParams
-    neighborhood::Symbol  # :two_opt, :three_opt
+    neighborhood::Symbol  # :two_opt, :three_opt, :inter_route
     strategy::Symbol      # :first_improvement, :best_improvement
     use_delta::Bool       # true for delta evaluation, false for full re-evaluation
 end
@@ -361,6 +319,8 @@ function MHLib.local_improve!(s::SCFPDPSolution, par::LocalSearchParams, result:
         improved = local_search_2opt!(s, par)
     elseif par.neighborhood == :three_opt
         improved = local_search_3opt!(s, par)
+    elseif par.neighborhood == :inter_route
+        improved = local_search_inter_route!(s, par)
     else
         error("Unknown neighborhood type: $(par.neighborhood)")
     end
@@ -377,6 +337,7 @@ end
     local_search_2opt!(s, par, result)
 
 Perform 2-opt local search on the SCF-PDP solution `s`.
+Returns true if an improving move was applied, false otherwise.
 """
 function local_search_2opt!(s::SCFPDPSolution, par::LocalSearchParams)
     improved = false
@@ -577,6 +538,104 @@ function two_opt_delta_eval(s::SCFPDPSolution, k::Int, i::Int, j::Int)
     new_dist = inst.d[node_i, node_j] + inst.d[node_i_next, node_j_next]
     
     return new_dist - old_dist
+end
+
+
+"""
+    local_search_inter_route!(s, par)
+
+Perform inter-route swapping of two requests on the SCF-PDP solution `s`.
+Returns true if an improving move was applied, false otherwise.
+"""
+function local_search_inter_route!(s::SCFPDPSolution, par::LocalSearchParams)
+    improved = false
+
+    # Try inter-route moves between all pairs of vehicles
+    for k1 in 1:(s.inst.nk - 1)
+        for k2 in (k1 + 1):s.inst.nk
+            if par.strategy == :first_improvement
+                improved = inter_route_first_improvement!(s, k1, k2, par.use_delta)
+            elseif par.strategy == :best_improvement
+                improved = inter_route_best_improvement!(s, k1, k2, par.use_delta)
+            end
+        end
+    end
+
+    return improved
+end
+
+"""
+    inter_route_first_improvement!(s, k1, k2)
+
+Perform first improvement inter-route swapping of two requests between vehicles `k1` and `k2` of solution `s`.
+Returns true if an improving move was applied, false otherwise.
+"""
+function inter_route_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_delta::Bool)
+    route1 = s.routes[k1]
+    route2 = s.routes[k2]
+
+    # Try swapping request r1 from k1 with request r2 from k2
+    for i1 in 1:(length(route1))
+        for i2 in 1:(length(route2))
+            r1, is_pickup1 = node_to_request(s.inst, route1[i1])
+            r2, is_pickup2 = node_to_request(s.inst, route2[i2])
+
+            # Only consider valid swaps (both pickups; if both are dropoffs, they have already been swapped)
+            if is_pickup1 && is_pickup2
+                if use_delta
+                    # TODO implement inter-route first improvement with delta evaluation
+                else
+                    # Baseline: full objective recalculation
+                    old_obj = MHLib.obj(s)
+
+                    # Get corresponding dropoff nodes for swapping
+                    dropoff_node1 = s.inst.dropoff[r1]
+                    dropoff_node2 = s.inst.dropoff[r2]
+                    idx_dropoff1 = findfirst(==(dropoff_node1), route1)
+                    idx_dropoff2 = findfirst(==(dropoff_node2), route2)
+
+                    # Swap the pickup nodes
+                    route1[i1], route2[i2] = route2[i2], route1[i1]
+                    # Also swap the corresponding dropoff nodes
+                    route1[idx_dropoff1], route2[idx_dropoff2] = route2[idx_dropoff2], route1[idx_dropoff1]
+
+                    # Check feasibility
+                    if is_feasible(s)
+                        # Recalculate full objective
+                        s.obj_val_valid = false
+                        new_obj = MHLib.obj(s)
+
+                        if new_obj < old_obj - 1e-6  # Improvement found
+                            return true # Exit after first improvement
+                        else
+                            # Revert the swap
+                            route1[i1], route2[i2] = route2[i2], route1[i1]
+                            route1[idx_dropoff1], route2[idx_dropoff2] = route2[idx_dropoff2], route1[idx_dropoff1]
+                            s.obj_val_valid = true
+                        end
+                    else
+                        # Revert the swap
+                        route1[i1], route2[i2] = route2[i2], route1[i1]
+                        route1[idx_dropoff1], route2[idx_dropoff2] = route2[idx_dropoff2], route1[idx_dropoff1]
+                        s.obj_val_valid = true
+                    end
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+"""
+    inter_route_best_improvement!(s, k1, k2)
+
+Perform best improvement inter-route swapping of two requests between vehicles `k1` and `k2` of solution `s`.
+Returns true if an improving move was applied, false otherwise.
+"""
+function inter_route_best_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_delta::Bool)
+    # TODO implement inter-route best improvement
+    return false
 end
 
 # """
@@ -1031,8 +1090,8 @@ Solve a given SCFPDP instance with the algorithm `alg`.
 #                                             "instances", "50", "train",
 #                                             "instance1_nreq50_nveh2_gamma50.txt");
 #         seed = nothing, titer = 1000, kwargs...)
-function solve_scfpdp(alg::AbstractString = "nn_det";
-                      filename::AbstractString = "",
+function solve_scfpdp(alg::AbstractString = "nn_det",
+                      filename::AbstractString = "";
                       seed = nothing,
                       titer::Int = 1000,
                       kwargs...)
@@ -1071,7 +1130,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det";
             sol,
             [MHMethod("con", construct!)],
             [MHMethod("li1", local_improve!,
-                      LocalSearchParams(:two_opt, :first_improvement, false))],
+                      LocalSearchParams(:inter_route, :first_improvement, false))],
             MHMethod[];
             consider_initial_sol = true,
             titer = titer,
