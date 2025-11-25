@@ -288,12 +288,12 @@ end
 """
     LocalSearchParams
 Parameters for local search methods in SCF-PDP.
-    - `neighborhood`: Symbol indicating the type of neighborhood to use (:two_opt, :three_opt, :inter_route)
+    - `neighborhood`: Symbol indicating the type of neighborhood to use (:two_opt, :inter_route, :relocate)
     - `strategy`: Symbol indicating the improvement strategy (:first_improvement, :best_improvement)
     - `use_delta`: Bool indicating whether to use delta evaluation (true) or full re-evaluation (false)
 """
 struct LocalSearchParams
-    neighborhood::Symbol  # :two_opt, :three_opt, :inter_route
+    neighborhood::Symbol  # :two_opt, :inter_route, :relocate
     strategy::Symbol      # :first_improvement, :best_improvement
     use_delta::Bool       # true for delta evaluation, false for full re-evaluation
 end
@@ -310,7 +310,7 @@ LocalSearchParams(; neighborhood=:two_opt, strategy=:first_improvement, use_delt
 `MHMethod` that performs local search for SCF-PDP.
 
 The `par` parameter specifies the configuration of the local search:
-- `par.neighborhood`: Symbol indicating the type of neighborhood to use (:two_opt, :three_opt)
+- `par.neighborhood`: Symbol indicating the type of neighborhood to use (:two_opt, :inter_route, :relocate)
 - `par.strategy`: Symbol indicating the improvement strategy (:first_improvement, :best_improvement)
 - `par.use_delta`: Bool indicating whether to use delta evaluation (true) or full re-evaluation (false)
 """
@@ -319,10 +319,10 @@ function MHLib.local_improve!(s::SCFPDPSolution, par::LocalSearchParams, result:
 
     if par.neighborhood == :two_opt
         improved = local_search_2opt!(s, par)
-    elseif par.neighborhood == :three_opt
-        improved = local_search_3opt!(s, par)
     elseif par.neighborhood == :inter_route
         improved = local_search_inter_route!(s, par)
+    elseif par.neighborhood == :relocate
+        improved = local_search_relocate!(s, par)
     else
         error("Unknown neighborhood type: $(par.neighborhood)")
     end
@@ -709,6 +709,141 @@ function inter_route_best_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_
 
     return false
 end
+
+
+"""
+    local_search_relocate!(s, par)
+
+Perform request relocation (moving a request from one vehicle to another) on the SCF-PDP solution `s`.
+Returns true if an improving move was applied, false otherwise.
+"""
+function local_search_relocate!(s::SCFPDPSolution, par::LocalSearchParams)
+    improved = false
+
+    # Try relocation from each vehicle to every other vehicle
+    for k1 in 1:(s.inst.nk)
+        for k2 in 1:s.inst.nk
+            if k1 == k2
+                continue
+            end
+            if par.strategy == :first_improvement
+                improved = relocate_first_improvement!(s, k1, k2, par.use_delta)
+            elseif par.strategy == :best_improvement
+                improved = relocate_best_improvement!(s, k1, k2, par.use_delta)
+            end
+        end
+    end
+
+    return improved
+end
+
+
+"""
+    relocate_first_improvement!(s, k1, k2, use_delta)
+
+Perform first improvement relocation of a request from vehicle `k1` to vehicle `k2` in solution `s`.
+Returns true if an improving move was applied, false otherwise.
+"""
+function relocate_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_delta::Bool)
+    route1 = s.routes[k1]
+    route2 = s.routes[k2]
+
+    for idx_pickup in 1:(length(route1))
+        println("Considering pickup at index $idx_pickup in route $k1")
+        r, is_pickup = node_to_request(s.inst, route1[idx_pickup])
+        if !is_pickup
+            continue
+        else
+            dropoff_node = s.inst.dropoff[r]
+            idx_dropoff = findfirst(==(dropoff_node), route1)
+            # Try all insertion positions in route2
+            for pickup_pos in 1:(length(route2) + 1)
+                for dropoff_pos in (pickup_pos + 1):(length(route2) + 2)
+                    if use_delta
+                        # TODO implement relocate first improvement with delta evaluation
+                    else
+                        # Baseline: full objective recalculation
+                        old_obj = MHLib.obj(s)
+                        println("Index $idx_pickup, old objective: $old_obj")
+
+                        # Remove from route1 (delete higher index first to avoid index shifting issues)
+                        pickup_node = route1[idx_pickup]
+                        if idx_dropoff > idx_pickup
+                            deleteat!(route1, idx_dropoff)
+                            deleteat!(route1, idx_pickup)
+                        else
+                            deleteat!(route1, idx_pickup)
+                            deleteat!(route1, idx_dropoff)
+                        end
+
+                        # Insert into route2
+                        insert!(route2, pickup_pos, pickup_node)
+                        insert!(route2, dropoff_pos, dropoff_node)
+
+                        # Check feasibility
+                        if is_feasible(s)
+                            # Recalculate full objective
+                            s.obj_val_valid = false
+                            new_obj = MHLib.obj(s)
+                            println("Index $idx_pickup, new objective: $new_obj")
+
+                            if new_obj < old_obj - 1e-6  # Improvement found
+                                println("IMPROVEMENT! Keep relocated request $r from vehicle $k1 to vehicle $k2")
+                                println("New objective: $new_obj (old: $old_obj)")
+                                return true # Exit after first improvement
+                            else
+                                # Revert the move (delete from route2 in reverse order)
+                                deleteat!(route2, dropoff_pos)
+                                deleteat!(route2, pickup_pos)
+                                # Insert back into route1 (insert lower index first)
+                                if idx_dropoff > idx_pickup
+                                    insert!(route1, idx_pickup, pickup_node)
+                                    insert!(route1, idx_dropoff, dropoff_node)
+                                else
+                                    insert!(route1, idx_dropoff, dropoff_node)
+                                    insert!(route1, idx_pickup, pickup_node)
+                                end
+                                s.obj_val = old_obj
+                                s.obj_val_valid = true
+                                println("Reverted relocation of request $r from vehicle $k1 to vehicle $k2, because no improvement.")
+                            end
+                        else
+                            # Revert the move (delete from route2 in reverse order)
+                            deleteat!(route2, dropoff_pos)
+                            deleteat!(route2, pickup_pos)
+                            # Insert back into route1 (insert lower index first)
+                            if idx_dropoff > idx_pickup
+                                insert!(route1, idx_pickup, pickup_node)
+                                insert!(route1, idx_dropoff, dropoff_node)
+                            else
+                                insert!(route1, idx_dropoff, dropoff_node)
+                                insert!(route1, idx_pickup, pickup_node)
+                            end
+                            s.obj_val = old_obj
+                            s.obj_val_valid = true
+                            println("Reverted relocation of request $r from vehicle $k1 to vehicle $k2, because infeasible.")
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+
+"""
+    relocate_best_improvement!(s, k1, k2, use_delta)
+
+Perform best improvement relocation of a request from vehicle `k1` to vehicle `k2` in solution `s`.
+Returns true if an improving move was applied, false otherwise.
+"""
+function relocate_best_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_delta::Bool)
+    # TODO implement best improvement relocation
+    return false
+end
+
 
 # """
 #     shaking!(tsp_solution, par, result)
