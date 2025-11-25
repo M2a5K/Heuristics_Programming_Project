@@ -67,8 +67,8 @@ end
 end
 
 @testitem "SCF_PDP_NNDeterministic" setup=[MHLibTestInit] begin
-    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
-    sol  = SCF_PDP_Solution(inst)
+    inst = SCFPDPInstance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol  = SCFPDPSolution(inst)
 
     MHLibDemos.construct_nn_det!(sol)
     @test MHLibDemos.is_feasible(sol)
@@ -88,8 +88,8 @@ end
 
 
 @testitem "SCF_PDP_NNRand" setup=[MHLibTestInit] begin
-    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
-    sol  = SCF_PDP_Solution(inst)
+    inst = SCFPDPInstance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol  = SCFPDPSolution(inst)
 
     MHLibDemos.construct_nn_rand!(sol; alpha=0.3)
     @test MHLibDemos.is_feasible(sol)
@@ -99,7 +99,7 @@ end
 end
 
 @testitem "SCF_PDP_NNRand_MultiStart" setup=[MHLibTestInit] begin
-    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    inst = SCFPDPInstance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
 
     # local redefinition to be able to run the test 
     function multistart_randomized_construction_test(inst; alpha=0.3, iters=20)
@@ -107,7 +107,7 @@ end
         best_val = Inf
 
         for _ in 1:iters
-            s = SCF_PDP_Solution(inst)
+            s = SCFPDPSolution(inst)
             MHLibDemos.construct_nn_rand!(s; alpha)
 
             if s.obj_val < best_val
@@ -128,8 +128,8 @@ end
 
 
 @testitem "SCF_PDP_Pilot" setup=[MHLibTestInit] begin
-    inst = SCF_PDP_Instance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
-    sol  = SCF_PDP_Solution(inst)
+    inst = SCFPDPInstance(joinpath(datapath, "instance1_nreq50_nveh2_gamma50.txt"))
+    sol  = SCFPDPSolution(inst)
 
     MHLibDemos.construct_pilot!(sol)
     @test MHLibDemos.is_feasible(sol)
