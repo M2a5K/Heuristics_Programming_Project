@@ -301,6 +301,10 @@ end
 # Default constructor for backward compatibility
 LocalSearchParams() = LocalSearchParams(:two_opt, :first_improvement, false)
 
+# Keyword constructor (for easier execuation of different parameter configurations in REPL)
+LocalSearchParams(; neighborhood=:two_opt, strategy=:first_improvement, use_delta=false) =
+    LocalSearchParams(neighborhood, strategy, use_delta)
+
 
 """
     local_improve!(s, par, result)
@@ -1162,6 +1166,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
                       filename::AbstractString = "";
                       seed = nothing,
                       titer::Int = 1000,
+                      lsparams::LocalSearchParams = LocalSearchParams(),
                       kwargs...)
 
     # require filename when using this helper
@@ -1171,6 +1176,34 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
 
     isnothing(seed) && (seed = rand(0:typemax(Int32)))
     Random.seed!(seed)
+
+    # override fields in lsparams from kwargs if provided
+    if :neighborhood in keys(kwargs)
+        lsparams = LocalSearchParams(
+            neighborhood=kwargs[:neighborhood],
+            strategy=lsparams.strategy,
+            use_delta=lsparams.use_delta
+        )
+    end
+    if :strategy in keys(kwargs)
+        lsparams = LocalSearchParams(
+            neighborhood=lsparams.neighborhood,
+            strategy=kwargs[:strategy],
+            use_delta=lsparams.use_delta
+        )
+    end
+    if :use_delta in keys(kwargs)
+        lsparams = LocalSearchParams(
+            neighborhood=lsparams.neighborhood,
+            strategy=lsparams.strategy,
+            use_delta=kwargs[:use_delta]
+        )
+    end
+
+    # Filter kwargs to only include valid SchedulerConfig parameters
+    # to avoid "ERROR: MethodError: no method matching MHLib.SchedulerConfig" when passing lsparams as kwargs to solve_scfpdp
+    valid_scheduler_keys = (:checkit, :log, :lnewinc, :lfreq, :ttime, :tciter, :tctime, :tobj)
+    scheduler_kwargs = filter(p -> p.first in valid_scheduler_keys, kwargs)
 
     println("SCFPDP solver called with parameters:")
     println("alg=$alg, filename=$filename, seed=$seed, ", (; kwargs...))
@@ -1193,16 +1226,16 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
     elseif alg == "pilot"
         construct_pilot!(sol)
 
-    elseif alg == "ls"
+    elseif alg == "ls"        
         heuristic = GVNS(
             sol,
             [MHMethod("con", construct!)],
             [MHMethod("li1", local_improve!,
-                      LocalSearchParams(:inter_route, :best_improvement, false))],
+                LocalSearchParams(lsparams.neighborhood, lsparams.strategy, lsparams.use_delta))],
             MHMethod[];
             consider_initial_sol = true,
             titer = titer,
-            kwargs...,
+            scheduler_kwargs...,
         )
         run!(heuristic)
         method_statistics(heuristic.scheduler)
