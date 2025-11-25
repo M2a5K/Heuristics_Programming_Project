@@ -1385,7 +1385,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         alpha  = get(kwargs, :alpha, 0.3)   # same alpha as in construct_nn_rand!
 
         # Local search parameters
-        ls_par = LocalSearchParams(:two_opt, :first_improvement, false)
+        ls_par = LocalSearchParams(lsparams.neighborhood, lsparams.strategy, lsparams.use_delta)
 
         best_sol = nothing
         best_val = Inf
