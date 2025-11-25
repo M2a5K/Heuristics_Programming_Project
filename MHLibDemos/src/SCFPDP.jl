@@ -1152,7 +1152,7 @@ Solve a given SCFPDP instance with the algorithm `alg`.
 
 # Parameters
 - `filename`: File name of the SCFPDP instance
-- `alg`: Algorithm to apply ("nn_det", "nn_rand", "pilot", "beam", "ls", "vnd", "grasp")
+- `alg`: Algorithm to apply ("nn_det", "nn_rand", "pilot", "ls", "vnd", "grasp")
 - `seed`: Possible random seed for reproducibility; if `nothing`, a random seed is chosen
 - `titer`: Number of iterations for the solving algorithm, gets a new default value
 - `kwargs`: Additional configuration parameters passed to the algorithm, e.g., `ttime`
