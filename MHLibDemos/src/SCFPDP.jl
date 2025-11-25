@@ -634,7 +634,75 @@ Perform best improvement inter-route swapping of two requests between vehicles `
 Returns true if an improving move was applied, false otherwise.
 """
 function inter_route_best_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_delta::Bool)
-    # TODO implement inter-route best improvement
+    route1 = s.routes[k1]
+    route2 = s.routes[k2]
+    best_move = (Inf, -1, -1, -1, -1) # (obj_val or delta, idx_pickup1, idx_pickup2, idx_dropoff1, idx_dropoff2)
+
+    # Try swapping request r1 from k1 with request r2 from k2
+    for i1 in 1:(length(route1))
+        for i2 in 1:(length(route2))
+            r1, is_pickup1 = node_to_request(s.inst, route1[i1])
+            r2, is_pickup2 = node_to_request(s.inst, route2[i2])
+
+            # Only consider valid swaps (both pickups; if both are dropoffs, they have already been swapped)
+            if is_pickup1 && is_pickup2
+                if use_delta
+                    # TODO implement inter-route best improvement with delta evaluation
+                else
+                    # Baseline: full objective recalculation
+                    old_obj = MHLib.obj(s)
+
+                    # Get corresponding dropoff nodes for swapping
+                    dropoff_node1 = s.inst.dropoff[r1]
+                    dropoff_node2 = s.inst.dropoff[r2]
+                    idx_dropoff1 = findfirst(==(dropoff_node1), route1)
+                    idx_dropoff2 = findfirst(==(dropoff_node2), route2)
+
+                    # Swap the pickup nodes
+                    route1[i1], route2[i2] = route2[i2], route1[i1]
+                    # Also swap the corresponding dropoff nodes
+                    route1[idx_dropoff1], route2[idx_dropoff2] = route2[idx_dropoff2], route1[idx_dropoff1]
+
+                    # Check feasibility
+                    if is_feasible(s)
+                        # Recalculate full objective
+                        s.obj_val_valid = false
+                        new_obj = MHLib.obj(s)
+
+                        if new_obj < best_move[1]
+                            best_move = (new_obj, i1, i2, idx_dropoff1, idx_dropoff2)
+                        end
+                        # Revert the swap for now
+                        route1[i1], route2[i2] = route2[i2], route1[i1]
+                        route1[idx_dropoff1], route2[idx_dropoff2] = route2[idx_dropoff2], route1[idx_dropoff1]
+                        s.obj_val = old_obj
+                        s.obj_val_valid = true
+                    else
+                        # Revert the swap
+                        route1[i1], route2[i2] = route2[i2], route1[i1]
+                        route1[idx_dropoff1], route2[idx_dropoff2] = route2[idx_dropoff2], route1[idx_dropoff1]
+                        s.obj_val = old_obj
+                        s.obj_val_valid = true
+                    end
+                end
+            end
+        end
+    end
+
+    # Apply the best move found, if any
+    if best_move[2] != -1
+        _, i1_best, i2_best, idx_dropoff1_best, idx_dropoff2_best = best_move
+        route1[i1_best], route2[i2_best] = route2[i2_best], route1[i1_best]
+        route1[idx_dropoff1_best], route2[idx_dropoff2_best] = route2[idx_dropoff2_best], route1[idx_dropoff1_best]
+        if use_delta
+            s.obj_val += best_move[1]
+        else
+            s.obj_val = best_move[1]
+        end
+        s.obj_val_valid = false
+        return true
+    end
+
     return false
 end
 
@@ -1130,7 +1198,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
             sol,
             [MHMethod("con", construct!)],
             [MHMethod("li1", local_improve!,
-                      LocalSearchParams(:inter_route, :first_improvement, false))],
+                      LocalSearchParams(:inter_route, :best_improvement, false))],
             MHMethod[];
             consider_initial_sol = true,
             titer = titer,
