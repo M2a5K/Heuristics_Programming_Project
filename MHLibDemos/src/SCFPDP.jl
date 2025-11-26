@@ -237,16 +237,17 @@ function MHLib.calc_objective(s::SCFPDPSolution)
     
     # Calculate fairness component using the Jain fairness measure
 
-    # Only consider used routes (non-zero times) for fairness calculation to be correct.
-    # According to the handout, we sum over all K, where K is the "fleet of nK identical vehicles".
-    # We interpret this as all the vehicles that are actually being used.
-    used_routes = filter(t -> t > 0, route_times)
+    # QUESTION: Should we consider only used routes (non-zero times) for fairness calculation?
+        # Only consider used routes (non-zero times) for fairness calculation to be correct.
+        # According to the handout, we sum over all K, where K is the "fleet of nK identical vehicles".
+        # We interpret this as all the vehicles that are actually being used.
+        # used_routes = filter(t -> t > 0, route_times)
     
-    if isempty(used_routes)
-        fairness = 0.0
-    else
-        fairness = (total_time ^ 2) / (length(used_routes) * sum(t^2 for t in used_routes))
-    end
+    # if isempty(used_routes)
+    #     fairness = 0.0
+    # else
+        fairness = (total_time ^ 2) / (length(inst.nk) * sum(t^2 for t in route_times))
+    # end
     
     # Objective: minimize total time + rho * variance
     return total_time + inst.rho * (1 - fairness)
@@ -1150,6 +1151,9 @@ function construct_nn_det!(s::SCFPDPSolution)
     # empty solution
     initialize!(s)
 
+    # initial objective value to compare against
+    best_obj_val = s.obj_val
+
     # all requests initially available
     remaining = collect(1:inst.n)
 
@@ -1161,17 +1165,18 @@ function construct_nn_det!(s::SCFPDPSolution)
         # Try to insert each remaining request into each vehicle
         for r in remaining
             for k in 1:inst.nk
-                # check cost increase if we appended r to route k
-                Δ = extra_cost_if_append(inst, s.routes[k], r)
-
-                # apply the insertion and test feasibility
+                # apply the insertion on a temporary copy for now
                 tmp = copy(s)
                 append_request!(tmp, k, r)
+                new_obj_val = MHLib.calc_objective(tmp)
+                Δ = new_obj_val - best_obj_val
 
+                # test feasibility and check cost increase if we appended r to route k
                 if is_feasible(tmp) && Δ < best_Δ
                     best_Δ = Δ
                     best_r = r
                     best_k = k
+                    best_obj_val = new_obj_val
                 end
             end
         end
@@ -1211,17 +1216,23 @@ function construct_nn_rand!(s::SCFPDPSolution; alpha::Float64 = 0.3)
     inst = s.inst
     initialize!(s)
 
+    # initial objective value to compare against
+    best_obj_val = s.obj_val
+
     remaining = collect(1:inst.n)
 
     while count(s.served) < inst.gamma && !isempty(remaining)
-        # andidate list 
+        # candidate list 
         # each element Δ, r, k
         candidates = Tuple{Float64,Int,Int}[]
 
         for r in remaining
             for k in 1:inst.nk
-                # extra cost if we append r to route k
-                Δ = extra_cost_if_append(inst, s.routes[k], r)
+                # apply the insertion on a temporary copy for now
+                tmp = copy(s)
+                append_request!(tmp, k, r)
+                new_obj_val = MHLib.calc_objective(tmp)
+                Δ = new_obj_val - best_obj_val
 
                 # insert to check feasibility
                 tmp = copy(s)
@@ -1239,7 +1250,7 @@ function construct_nn_rand!(s::SCFPDPSolution; alpha::Float64 = 0.3)
         Δ_min = minimum(c[1] for c in candidates)
         Δ_max = maximum(c[1] for c in candidates)
 
-        # lectre notes formula , alpha can be dtermined by user
+        # lecture notes formula , alpha can be determined by user
         # RCL = { (Δ,r,k) in CL | Δ <= Δ_min + alpha*(Δ_max - Δ_min) }
         thresh = Δ_min + alpha * (Δ_max - Δ_min)
         rcl = [(Δ, r, k) for (Δ, r, k) in candidates if Δ <= thresh]
@@ -1297,6 +1308,9 @@ function greedy_complete!(s::SCFPDPSolution)
     inst = s.inst
     remaining = findall(!, s.served)  # requests not yet served
 
+    # initial objective value to compare against
+    best_obj_val = s.obj_val
+
     while count(s.served) < inst.gamma && !isempty(remaining)
         best_Δ = Inf
         best_r = 0
@@ -1304,15 +1318,17 @@ function greedy_complete!(s::SCFPDPSolution)
 
         for r in remaining
             for k in 1:inst.nk
-                Δ = extra_cost_if_append(inst, s.routes[k], r)
-
+                # apply the insertion on a temporary copy for now
                 tmp = copy(s)
                 append_request!(tmp, k, r)
+                new_obj_val = MHLib.calc_objective(tmp)
+                Δ = new_obj_val - best_obj_val
 
                 if is_feasible(tmp) && Δ < best_Δ
                     best_Δ = Δ
                     best_r = r
                     best_k = k
+                    best_obj_val = new_obj_val
                 end
             end
         end
