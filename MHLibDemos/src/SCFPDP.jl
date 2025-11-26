@@ -840,7 +840,113 @@ Perform best improvement relocation of a request from vehicle `k1` to vehicle `k
 Returns true if an improving move was applied, false otherwise.
 """
 function relocate_best_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_delta::Bool)
-    # TODO implement best improvement relocation
+    route1 = s.routes[k1]
+    route2 = s.routes[k2]
+    best_move = (Inf, -1, -1, -1, -1)
+    # idx_pickup and idx_dropoff refer to positions in route1
+    # pickup_pos and dropoff_pos refer to positions in route2
+
+    for idx_pickup in 1:(length(route1))
+        r, is_pickup = node_to_request(s.inst, route1[idx_pickup])
+        if !is_pickup
+            continue
+        else
+            pickup_node = route1[idx_pickup]
+            dropoff_node = s.inst.dropoff[r]
+            idx_dropoff = findfirst(==(dropoff_node), route1)
+            # Try all insertion positions in route2
+            for pickup_pos in 1:(length(route2) + 1)
+                for dropoff_pos in (pickup_pos + 1):(length(route2) + 2)
+                    if use_delta
+                        # TODO implement relocate first improvement with delta evaluation
+                    else
+                        # Baseline: full objective recalculation
+                        old_obj = MHLib.obj(s)
+
+                        # Remove from route1 (delete higher index first to avoid index shifting issues)
+                        if idx_dropoff > idx_pickup
+                            deleteat!(route1, idx_dropoff)
+                            deleteat!(route1, idx_pickup)
+                        else
+                            deleteat!(route1, idx_pickup)
+                            deleteat!(route1, idx_dropoff)
+                        end
+
+                        # Insert into route2
+                        insert!(route2, pickup_pos, pickup_node)
+                        insert!(route2, dropoff_pos, dropoff_node)
+
+                        # Check feasibility
+                        if is_feasible(s)
+                            # Recalculate full objective
+                            s.obj_val_valid = false
+                            new_obj = MHLib.obj(s)
+
+                            if new_obj < best_move[1]  # Improvement found
+                                best_move = (new_obj, idx_pickup, idx_dropoff, pickup_pos, dropoff_pos)
+                            end
+                            # Revert the move for now
+                            deleteat!(route2, dropoff_pos)
+                            deleteat!(route2, pickup_pos)
+                            # Insert back into route1 (insert lower index first)
+                            if idx_dropoff > idx_pickup
+                                insert!(route1, idx_pickup, pickup_node)
+                                insert!(route1, idx_dropoff, dropoff_node)
+                            else
+                                insert!(route1, idx_dropoff, dropoff_node)
+                                insert!(route1, idx_pickup, pickup_node)
+                            end
+                            s.obj_val = old_obj
+                            s.obj_val_valid = true
+                        else
+                            # Revert the move (delete from route2 in reverse order)
+                            deleteat!(route2, dropoff_pos)
+                            deleteat!(route2, pickup_pos)
+                            # Insert back into route1 (insert lower index first)
+                            if idx_dropoff > idx_pickup
+                                insert!(route1, idx_pickup, pickup_node)
+                                insert!(route1, idx_dropoff, dropoff_node)
+                            else
+                                insert!(route1, idx_dropoff, dropoff_node)
+                                insert!(route1, idx_pickup, pickup_node)
+                            end
+                            s.obj_val = old_obj
+                            s.obj_val_valid = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    # Apply the best move found, if any
+    if best_move[2] != -1
+        _, idx_pickup_best, idx_dropoff_best, pickup_pos_best, dropoff_pos_best = best_move
+
+        # Remove from route1 (delete higher index first to avoid index shifting issues)
+        pickup_node = route1[idx_pickup_best]
+        dropoff_node = route1[idx_dropoff_best]
+        if idx_dropoff_best > idx_pickup_best
+            deleteat!(route1, idx_dropoff_best)
+            deleteat!(route1, idx_pickup_best)
+        else
+            deleteat!(route1, idx_pickup_best)
+            deleteat!(route1, idx_dropoff_best)
+        end
+
+        # Insert into route2
+        insert!(route2, pickup_pos_best, pickup_node)
+        insert!(route2, dropoff_pos_best, dropoff_node)
+
+        if use_delta
+            s.obj_val += best_move[1]
+        else
+            s.obj_val = best_move[1]
+        end
+        s.obj_val_valid = false
+        return true
+    end
+
     return false
 end
 
