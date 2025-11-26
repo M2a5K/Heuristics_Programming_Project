@@ -492,8 +492,10 @@ function two_opt_best_improvement!(s::SCFPDPSolution, k::Int, use_delta::Bool)
         end
     end
 
-    # Apply the best move found, if any
-    if best_move[2] != -1
+    # Apply the best move found, if any improvement
+    # Check if best move is better than current solution
+    current_obj = MHLib.obj(s)
+    if best_move[2] != -1 && best_move[1] < current_obj - 1e-6
         _, i_best, j_best = best_move
         reverse!(route, i_best + 1, j_best)
         if use_delta
@@ -693,8 +695,10 @@ function inter_route_best_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_
         end
     end
 
-    # Apply the best move found, if any
-    if best_move[2] != -1
+    # Apply the best move found, if any improvement
+    # Check if best move is better than current solution
+    current_obj = MHLib.obj(s)
+    if best_move[2] != -1 && best_move[1] < current_obj - 1e-6
         _, i1_best, i2_best, idx_dropoff1_best, idx_dropoff2_best = best_move
         route1[i1_best], route2[i2_best] = route2[i2_best], route1[i1_best]
         route1[idx_dropoff1_best], route2[idx_dropoff2_best] = route2[idx_dropoff2_best], route1[idx_dropoff1_best]
@@ -919,8 +923,10 @@ function relocate_best_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_del
         end
     end
 
-    # Apply the best move found, if any
-    if best_move[2] != -1
+    # Apply the best move found, if any improvement
+    # Check if best move is better than current solution
+    current_obj = MHLib.obj(s)
+    if best_move[2] != -1 && best_move[1] < current_obj - 1e-6
         _, idx_pickup_best, idx_dropoff_best, pickup_pos_best, dropoff_pos_best = best_move
 
         # Remove from route1 (delete higher index first to avoid index shifting issues)
