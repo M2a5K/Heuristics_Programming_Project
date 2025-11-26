@@ -753,7 +753,6 @@ function relocate_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_de
     route2 = s.routes[k2]
 
     for idx_pickup in 1:(length(route1))
-        println("Considering pickup at index $idx_pickup in route $k1")
         r, is_pickup = node_to_request(s.inst, route1[idx_pickup])
         if !is_pickup
             continue
@@ -768,7 +767,6 @@ function relocate_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_de
                     else
                         # Baseline: full objective recalculation
                         old_obj = MHLib.obj(s)
-                        println("Index $idx_pickup, old objective: $old_obj")
 
                         # Remove from route1 (delete higher index first to avoid index shifting issues)
                         pickup_node = route1[idx_pickup]
@@ -789,11 +787,8 @@ function relocate_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_de
                             # Recalculate full objective
                             s.obj_val_valid = false
                             new_obj = MHLib.obj(s)
-                            println("Index $idx_pickup, new objective: $new_obj")
 
                             if new_obj < old_obj - 1e-6  # Improvement found
-                                println("IMPROVEMENT! Keep relocated request $r from vehicle $k1 to vehicle $k2")
-                                println("New objective: $new_obj (old: $old_obj)")
                                 return true # Exit after first improvement
                             else
                                 # Revert the move (delete from route2 in reverse order)
@@ -809,7 +804,6 @@ function relocate_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_de
                                 end
                                 s.obj_val = old_obj
                                 s.obj_val_valid = true
-                                println("Reverted relocation of request $r from vehicle $k1 to vehicle $k2, because no improvement.")
                             end
                         else
                             # Revert the move (delete from route2 in reverse order)
@@ -825,7 +819,6 @@ function relocate_first_improvement!(s::SCFPDPSolution, k1::Int, k2::Int, use_de
                             end
                             s.obj_val = old_obj
                             s.obj_val_valid = true
-                            println("Reverted relocation of request $r from vehicle $k1 to vehicle $k2, because infeasible.")
                         end
                     end
                 end
@@ -1490,7 +1483,26 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         copy!(sol, heuristic.scheduler.incumbent)
 
     elseif alg == "vnd"
-        error("Algorithm 'vnd' not yet implemented.")
+        heuristic = GVNS(
+            sol,
+            [MHMethod("con", construct!)],
+            [
+                MHMethod("li1", local_improve!,
+                    LocalSearchParams(:relocate, lsparams.strategy, lsparams.use_delta)),
+                MHMethod("li2", local_improve!,
+                    LocalSearchParams(:inter_route, lsparams.strategy, lsparams.use_delta)),
+                MHMethod("li3", local_improve!,
+                    LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
+            ],
+            MHMethod[];
+            consider_initial_sol = true,
+            titer = titer,
+            scheduler_kwargs...,
+        )
+        run!(heuristic)
+        method_statistics(heuristic.scheduler)
+        main_results(heuristic.scheduler)
+        copy!(sol, heuristic.scheduler.incumbent)
 
     elseif alg == "grasp"
         niters = get(kwargs, :niters, 50)   # how many GRASP iterations
