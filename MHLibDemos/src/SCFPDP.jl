@@ -1636,27 +1636,54 @@ Recompute the SCF-PDP objective and return its components:
 - fairness   = Jain-type fairness term
 - obj        = total_time + ρ * fairness
 """
+# function decompose_objective(s::SCFPDPSolution)
+#     inst = s.inst
+
+#     # route times
+#     route_times = Float64[]
+#     total_time = 0.0
+#     for route in s.routes
+#         t = route_time(inst, route)
+#         push!(route_times, t)
+#         total_time += t
+#     end
+
+#     if isempty(route_times)
+#         return (Inf, 0.0, Inf)
+#     end
+
+#     fairness = (total_time^2) / (length(inst.nk) * sum(t^2 for t in route_times))
+#     obj = total_time + inst.rho * fairness
+
+#     return (total_time, fairness, obj)
+# end
+
 function decompose_objective(s::SCFPDPSolution)
     inst = s.inst
 
-    # route times
-    route_times = Float64[]
+    # 1) total travel time from the current routes
     total_time = 0.0
     for route in s.routes
-        t = route_time(inst, route)
-        push!(route_times, t)
-        total_time += t
+        total_time += route_time(inst, route)
     end
 
-    if isempty(route_times)
-        return (Inf, 0.0, Inf)
-    end
+    # 2) objective as used by the solver/logging
+    obj = MHLib.obj(s)
 
-    fairness = (total_time^2) / (length(inst.nk) * sum(t^2 for t in route_times))
-    obj = total_time + inst.rho * fairness
+    # 3) reconstruct fairness from obj = total_time + ρ * (1 - fairness)
+    fairness::Float64
+    if !isfinite(obj) || inst.rho == 0.0
+        # fairness irrelevant or undefined in these edge cases
+        fairness = 0.0
+    else
+        fairness = 1.0 - (obj - total_time) / inst.rho
+        # numerical safety: clamp to [0,1]
+        fairness = clamp(fairness, 0.0, 1.0)
+    end
 
     return (total_time, fairness, obj)
 end
+
 
 
 """
