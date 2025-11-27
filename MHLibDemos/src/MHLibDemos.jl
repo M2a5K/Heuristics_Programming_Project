@@ -10,7 +10,7 @@ module MHLibDemos
 using Graphs
 using MHLib
 
-export create_or_read_simple_graph
+export create_or_read_simple_graph, run_construction_experiments, run_search_experiments
 
 """
     create_or_read_simple_graph(name::AbstractString)
@@ -63,5 +63,6 @@ include("SCFPDP.jl")
 
 include("../test/tests.jl")
 include("../test/run_construction_experiments.jl")
+include("../test/run_search_experiments.jl")
 
 end  # module

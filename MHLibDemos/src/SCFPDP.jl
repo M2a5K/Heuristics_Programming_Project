@@ -1599,6 +1599,8 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
 
     total_iterations = 0
     total_runtime = 0.0
+    # it is possible that 'heuristic' is either a vector (nn_rand_multi) or a single GVNS
+    heuristic = heuristic isa AbstractVector ? heuristic : [heuristic]
     for heur in heuristic
         method_statistics(heur.scheduler)
         main_results(heur.scheduler)

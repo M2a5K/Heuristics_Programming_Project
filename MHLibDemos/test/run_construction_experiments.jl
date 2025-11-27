@@ -49,6 +49,7 @@ function run_construction_experiments(;
                 obj        = obj_det,
                 iters      = iters,
                 time       = time,
+                # TODO rename this to 'runtime'? (to avoid confusion with total_time)
             ))
 
             # --- randomized NN construction for each α ---
@@ -72,6 +73,7 @@ function run_construction_experiments(;
                     obj        = o_r,
                     iters      = iters,
                     time       = time,
+                    # TODO rename this to 'runtime'? (to avoid confusion with total_time)
                 ))
             end
         end
