@@ -1274,21 +1274,32 @@ function construct_nn_rand!(s::SCFPDPSolution; alpha::Float64 = 0.3)
 end
 
 # do the same but over multipl iters and return best 
-function multistart_randomized_construction(inst; alpha=0.3, iters=50)
+function multistart_randomized_construction(inst, titer, scheduler_kwargs; alpha=0.3, iters=50)
     best = nothing
     best_val = Inf
 
-    for _ in 1:iters
+    # collect multiple scheduling runs; their metrics will be used in solve_scfpdp
+    heuristic = Vector{GVNS}(undef, iters)
+
+    for i in 1:iters
         s = SCFPDPSolution(inst)
-        construct_nn_rand!(s; alpha)
+        heuristic[i] = GVNS(s, [MHMethod("con", (s, _, r) -> (construct_nn_rand!(s; alpha=alpha); r.changed = true))],
+            MHMethod[],
+            MHMethod[];
+            consider_initial_sol = false,
+            titer = titer,
+            scheduler_kwargs...,
+        )
 
         if s.obj_val < best_val
             best = copy(s)
             best_val = s.obj_val
         end
+
+        run!(heuristic[i])
     end
 
-    return best
+    return heuristic
 end
 
 
@@ -1491,7 +1502,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
     elseif alg == "nn_rand_multi"
         iters = get(kwargs, :iters, 50)
         alpha = get(kwargs, :alpha, 0.3)
-        sol = multistart_randomized_construction(inst; alpha = alpha, iters = iters)
+        heuristic = multistart_randomized_construction(inst, titer, scheduler_kwargs; alpha = alpha, iters = iters)
 
     elseif alg == "pilot"
         heuristic = GVNS(
@@ -1573,16 +1584,37 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         error("Algorithm '$alg' not yet implemented.")
     end
 
-    run!(heuristic)
-    method_statistics(heuristic.scheduler)
-    main_results(heuristic.scheduler)
-    println("Feasible? ", is_feasible(sol))
 
-    copy!(sol, heuristic.scheduler.incumbent)
+    if alg != "nn_rand_multi" && alg != "grasp"
+        run!(heuristic)
+        copy!(sol, heuristic.scheduler.incumbent)
+    else
+        # nn_rand_multi already ran inside its function
+        for heur in heuristic
+            if heur.scheduler.incumbent.obj_val < sol.obj_val
+                copy!(sol, heur.scheduler.incumbent)
+            end
+        end
+    end
+
+    total_iterations = 0
+    total_runtime = 0.0
+    for heur in heuristic
+        method_statistics(heur.scheduler)
+        main_results(heur.scheduler)
+        println("Feasible? ", is_feasible(heur.scheduler.incumbent))
+        total_iterations += heur.scheduler.iteration
+        total_runtime += heur.scheduler.run_time
+    end
+
+    # TODO no sure whether to average (in case of nn_rand_multi)
+    # if we do not average, runtimes are too high (program finishes in 0.5s, but total_time says 25s bc of 50 runs)
+    total_iterations /= length(heuristic)
+    total_runtime /= length(heuristic)
 
     save_solution(sol, alg, filename, seed, titer, lsparams)
 
-    return sol, heuristic.scheduler.iteration, heuristic.scheduler.run_time
+    return sol, total_iterations, total_runtime
 end
 
 
