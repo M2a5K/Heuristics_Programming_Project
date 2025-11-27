@@ -1468,11 +1468,25 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
     sol  = SCFPDPSolution(inst)
 
     if alg == "nn_det"
-        construct_nn_det!(sol)
+        heuristic = GVNS(
+            sol,
+            [MHMethod("con", (s, _, r) -> (construct_nn_det!(s); r.changed = true))],
+            MHMethod[],
+            MHMethod[];
+            consider_initial_sol = false,
+            titer = titer,
+            scheduler_kwargs...,
+        )
 
     elseif alg == "nn_rand"
         alpha = get(kwargs, :alpha, 0.3)
-        construct_nn_rand!(sol; alpha = alpha)
+        heuristic = GVNS(sol, [MHMethod("con", (s, _, r) -> (construct_nn_rand!(s; alpha=alpha); r.changed = true))],
+            MHMethod[],
+            MHMethod[];
+            consider_initial_sol = false,
+            titer = titer,
+            scheduler_kwargs...,
+        )
 
     elseif alg == "nn_rand_multi"
         iters = get(kwargs, :iters, 50)
@@ -1480,7 +1494,15 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         sol = multistart_randomized_construction(inst; alpha = alpha, iters = iters)
 
     elseif alg == "pilot"
-        construct_pilot!(sol)
+        heuristic = GVNS(
+            sol,
+            [MHMethod("con", (s, _, r) -> (construct_pilot!(s); r.changed = true))],
+            MHMethod[],
+            MHMethod[];
+            consider_initial_sol = false,
+            titer = titer,
+            scheduler_kwargs...,
+        )
 
     elseif alg == "ls"        
         heuristic = GVNS(
@@ -1493,10 +1515,6 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
             titer = titer,
             scheduler_kwargs...,
         )
-        run!(heuristic)
-        method_statistics(heuristic.scheduler)
-        main_results(heuristic.scheduler)
-        copy!(sol, heuristic.scheduler.incumbent)
 
     elseif alg == "vnd"
         heuristic = GVNS(
@@ -1515,11 +1533,8 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
             titer = titer,
             scheduler_kwargs...,
         )
-        run!(heuristic)
-        method_statistics(heuristic.scheduler)
-        main_results(heuristic.scheduler)
-        copy!(sol, heuristic.scheduler.incumbent)
 
+    # TODO use GVNS or Scheduler framework, as with the other algorithms, to have consistent statistics output
     elseif alg == "grasp"
         niters = get(kwargs, :niters, 50)   # how many GRASP iterations
         alpha  = get(kwargs, :alpha, 0.3)   # same alpha as in construct_nn_rand!
@@ -1558,10 +1573,16 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         error("Algorithm '$alg' not yet implemented.")
     end
 
-    println(sol)
+    run!(heuristic)
+    method_statistics(heuristic.scheduler)
+    main_results(heuristic.scheduler)
     println("Feasible? ", is_feasible(sol))
 
-    return sol
+    copy!(sol, heuristic.scheduler.incumbent)
+
+    save_solution(sol, alg, filename, seed, titer, lsparams)
+
+    return sol, heuristic.scheduler.iteration, heuristic.scheduler.run_time
 end
 
 
@@ -1597,8 +1618,34 @@ function decompose_objective(s::SCFPDPSolution)
         return (Inf, 0.0, Inf)
     end
 
-    fairness = (total_time^2) / (length(route_times) * sum(t^2 for t in route_times))
+    fairness = (total_time^2) / (length(inst.nk) * sum(t^2 for t in route_times))
     obj = total_time + inst.rho * fairness
 
     return (total_time, fairness, obj)
+end
+
+
+"""
+    save_solution(s::SCFPDPSolution, alg::String, filename::AbstractString,
+                       seed::Int, titer::Int, lsparams::LocalSearchParams)
+Save the SCFPDP solution `s` to a file with metadata in the filename.
+"""
+function save_solution(s::SCFPDPSolution, alg::String, filename::AbstractString,
+                       seed::Int, titer::Int, lsparams::LocalSearchParams)
+    outdir = joinpath(@__DIR__, "..", "test", "results", "solutions")
+    mkpath(outdir)
+
+    instancename = splitext(basename(filename))[1]
+    outfile = joinpath(outdir,
+        "sol_$(instancename)_$(alg)_s$(seed)_t$(titer)" *
+        "_$(lsparams.neighborhood)_$(lsparams.strategy)_$(lsparams.use_delta).txt")
+
+    open(outfile, "w") do io
+        println(io, instancename)
+        for (k, r) in enumerate(s.routes)
+            println(io, join(r, " "))
+        end
+    end
+
+    println("Solution saved to: $outfile")
 end

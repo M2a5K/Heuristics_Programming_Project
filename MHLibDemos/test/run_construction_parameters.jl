@@ -30,7 +30,7 @@ function run_construction_experiments(;
 
         for seed in seeds
             # --- deterministic NN construction ---
-            sol_det = solve_scfpdp("nn_det"; filename, seed)
+            sol_det, iters, time = solve_scfpdp("nn_det", filename; seed)
             t_det, fair_det, obj_det = decompose_objective(sol_det)
             inst = sol_det.inst
 
@@ -47,11 +47,13 @@ function run_construction_experiments(;
                 total_time = t_det,
                 fairness   = fair_det,
                 obj        = obj_det,
+                iters      = iters,
+                time       = time,
             ))
 
             # --- randomized NN construction for each α ---
             for α in alphas
-                sol_rand = solve_scfpdp("nn_rand"; filename, seed, alpha=α)
+                sol_rand, iters, time = solve_scfpdp("nn_rand", filename; seed, alpha=α)
                 t_r, f_r, o_r = decompose_objective(sol_rand)
                 inst = sol_rand.inst  # same instance, but nice and explicit
 
@@ -68,6 +70,8 @@ function run_construction_experiments(;
                     total_time = t_r,
                     fairness   = f_r,
                     obj        = o_r,
+                    iters      = iters,
+                    time       = time,
                 ))
             end
         end
@@ -78,7 +82,7 @@ function run_construction_experiments(;
     outdir = joinpath(@__DIR__, "results")
     mkpath(outdir)
 
-    outfile = joinpath(outdir, "construction_results_tuning.csv")
+    outfile = joinpath(outdir, "construction_results_experiments.csv")
     CSV.write(outfile, df)
 
     println("Results saved to: $outfile")
