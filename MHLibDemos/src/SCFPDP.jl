@@ -1653,7 +1653,7 @@ Recompute the SCF-PDP objective and return its components:
 #     end
 
 #     fairness = (total_time^2) / (length(inst.nk) * sum(t^2 for t in route_times))
-#     obj = total_time + inst.rho * fairness
+#     obj = total_time + inst.rho * (1 - fairness)
 
 #     return (total_time, fairness, obj)
 # end
@@ -1661,28 +1661,31 @@ Recompute the SCF-PDP objective and return its components:
 function decompose_objective(s::SCFPDPSolution)
     inst = s.inst
 
-    # 1) total travel time from the current routes
+    # route times per vehicle
+    route_times = Float64[]
     total_time = 0.0
     for route in s.routes
-        total_time += route_time(inst, route)
+        t = route_time(inst, route)
+        push!(route_times, t)
+        total_time += t
     end
 
-    # 2) objective as used by the solver/logging
-    obj = MHLib.obj(s)
-
-    # 3) reconstruct fairness from obj = total_time + ρ * (1 - fairness)
-    fairness::Float64
-    if !isfinite(obj) || inst.rho == 0.0
-        # fairness irrelevant or undefined in these edge cases
-        fairness = 0.0
-    else
-        fairness = 1.0 - (obj - total_time) / inst.rho
-        # numerical safety: clamp to [0,1]
-        fairness = clamp(fairness, 0.0, 1.0)
+    # No routes → meaningless objective
+    if isempty(route_times)
+        return (Inf, 0.0, Inf)
     end
+
+    # Number of vehicles (or use length(route_times) if you prefer only active ones)
+    m = inst.nk
+
+    denom = m * sum(t^2 for t in route_times)
+    fairness = denom == 0.0 ? 0.0 : total_time^2 / denom
+
+    obj = total_time + inst.rho * (1 - fairness)
 
     return (total_time, fairness, obj)
 end
+
 
 
 
