@@ -236,18 +236,7 @@ function MHLib.calc_objective(s::SCFPDPSolution)
     end
     
     # Calculate fairness component using the Jain fairness measure
-
-    # QUESTION: Should we consider only used routes (non-zero times) for fairness calculation?
-        # Only consider used routes (non-zero times) for fairness calculation to be correct.
-        # According to the handout, we sum over all K, where K is the "fleet of nK identical vehicles".
-        # We interpret this as all the vehicles that are actually being used.
-        # used_routes = filter(t -> t > 0, route_times)
-    
-    # if isempty(used_routes)
-    #     fairness = 0.0
-    # else
-        fairness = (total_time ^ 2) / (length(inst.nk) * sum(t^2 for t in route_times))
-    # end
+    fairness = (total_time ^ 2) / (length(inst.nk) * sum(t^2 for t in route_times))
     
     # Objective: minimize total time + rho * variance
     return total_time + inst.rho * (1 - fairness)
@@ -1105,10 +1094,6 @@ function is_feasible(s::SCFPDPSolution)
 
         for node in route
             r, is_pickup = node_to_request(inst, node)
-            # TODO this check might be unnecessary, because we don't store the depot in a route
-            if r == 0
-                continue  # depot should not appear inside routes
-            end
 
             if is_pickup
                 load += inst.c[r]
