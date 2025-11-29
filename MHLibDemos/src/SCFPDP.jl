@@ -1545,10 +1545,10 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
             scheduler_kwargs...,
         )
 
-    # TODO use GVNS or Scheduler framework, as with the other algorithms, to have consistent statistics output
     elseif alg == "grasp"
         niters = get(kwargs, :niters, 50)   # how many GRASP iterations
         alpha  = get(kwargs, :alpha, 0.3)   # same alpha as in construct_nn_rand!
+        heuristic = Vector{GVNS}(undef, niters)
 
         # Local search parameters
         ls_par = LocalSearchParams(lsparams.neighborhood, lsparams.strategy, lsparams.use_delta)
@@ -1558,14 +1558,20 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
 
         for it in 1:niters
             s_it = SCFPDPSolution(inst)
-            construct_nn_rand!(s_it; alpha = alpha)
+            
+            # Create GVNS with construction and local improvement
+            heuristic[it] = GVNS(
+                s_it,
+                [MHMethod("con", (s, _, r) -> (construct_nn_rand!(s; alpha=alpha); r.changed = true))],
+                [MHMethod("li_grasp", local_improve!, ls_par)],
+                MHMethod[];
+                consider_initial_sol = false,
+                titer = titer,
+                scheduler_kwargs...,
+            )
 
-            res = Result()
-            res.changed = true
-            while res.changed
-                res.changed = false
-                local_improve!(s_it, ls_par, res)
-            end
+            # Run construction and local improvement through the framework
+            run!(heuristic[it])
 
             val = MHLib.obj(s_it)
             if val < best_val
