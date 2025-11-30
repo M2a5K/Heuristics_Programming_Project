@@ -3,23 +3,17 @@
 #$ -j y
 #$ -o construction_experiments.log
 #$ -l h_rt=00:15:00
+#$ -cwd
 
 # Submit with: qsub run_11a.sh
 
-# Load Julia module (adjust version as needed for your cluster)
-# module load julia/1.11.0
-
-# Set Julia to use single thread (required by the script)
+# Set Julia to use single thread
 export JULIA_NUM_THREADS=1
 
-echo "MHLibDemos directory: $MHLIBDEMOS_DIR"
+echo "Running on host: $(hostname)"
+echo "Current directory: $(pwd)"
+echo "Starting Julia script test/run_11a.jl ..."
 
-# Run Julia with the experiment script using absolute path
-julia --project="$MHLIBDEMOS_DIR" -e "
-using Pkg
-Pkg.instantiate()
-using MHLibDemos
-run11a()
-"
+julia --project=. test/run_11a.jl
 
 echo "Construction experiments completed"

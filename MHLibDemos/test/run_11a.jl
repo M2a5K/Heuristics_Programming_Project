@@ -11,19 +11,19 @@ export run11a
 
 # Picking 6 instances (all from folder "test")
 instances = [
-    # size 50
-    joinpath(@__DIR__, "..", "instances", "50", "test",
-             "instance31_nreq50_nveh2_gamma50.txt"),
-    joinpath(@__DIR__, "..", "instances", "50", "test",
-             "instance36_nreq50_nveh2_gamma48.txt"),
-    joinpath(@__DIR__, "..", "instances", "50", "test",
-             "instance41_nreq50_nveh2_gamma45.txt"),
-    joinpath(@__DIR__, "..", "instances", "50", "test",
-             "instance46_nreq50_nveh2_gamma47.txt"),
-    joinpath(@__DIR__, "..", "instances", "50", "test",
-             "instance51_nreq50_nveh2_gamma45.txt"),
-    joinpath(@__DIR__, "..", "instances", "50", "test",
-             "instance56_nreq50_nveh2_gamma43.txt"),
+    # # size 50
+    # joinpath(@__DIR__, "..", "instances", "50", "test",
+    #          "instance31_nreq50_nveh2_gamma50.txt"),
+    # joinpath(@__DIR__, "..", "instances", "50", "test",
+    #          "instance36_nreq50_nveh2_gamma48.txt"),
+    # joinpath(@__DIR__, "..", "instances", "50", "test",
+    #          "instance41_nreq50_nveh2_gamma45.txt"),
+    # joinpath(@__DIR__, "..", "instances", "50", "test",
+    #          "instance46_nreq50_nveh2_gamma47.txt"),
+    # joinpath(@__DIR__, "..", "instances", "50", "test",
+    #          "instance51_nreq50_nveh2_gamma45.txt"),
+    # joinpath(@__DIR__, "..", "instances", "50", "test",
+    #          "instance56_nreq50_nveh2_gamma43.txt"),
 
     # # size 200
     # joinpath(@__DIR__, "..", "instances", "200", "test",
@@ -39,19 +39,19 @@ instances = [
     # joinpath(@__DIR__, "..", "instances", "200", "test",
     #          "instance56_nreq200_nveh4_gamma171.txt"),
 
-    # # size 1000
-    # joinpath(@__DIR__, "..", "instances", "1000", "test",
-    #          "instance31_nreq1000_nveh20_gamma890.txt"),
-    # joinpath(@__DIR__, "..", "instances", "1000", "test",
-    #          "instance36_nreq1000_nveh20_gamma909.txt"),
-    # joinpath(@__DIR__, "..", "instances", "1000", "test",
-    #          "instance41_nreq1000_nveh20_gamma861.txt"),
-    # joinpath(@__DIR__, "..", "instances", "1000", "test",
-    #          "instance46_nreq1000_nveh20_gamma904.txt"),
-    # joinpath(@__DIR__, "..", "instances", "1000", "test",
-    #          "instance51_nreq1000_nveh20_gamma929.txt"),
-    # joinpath(@__DIR__, "..", "instances", "1000", "test",
-    #          "instance56_nreq1000_nveh20_gamma867.txt"),
+    # size 1000
+    joinpath(@__DIR__, "..", "instances", "1000", "test",
+             "instance31_nreq1000_nveh20_gamma890.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test",
+             "instance36_nreq1000_nveh20_gamma909.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test",
+             "instance41_nreq1000_nveh20_gamma861.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test",
+             "instance46_nreq1000_nveh20_gamma904.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test",
+             "instance51_nreq1000_nveh20_gamma929.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test",
+             "instance56_nreq1000_nveh20_gamma867.txt"),
 
     # # size 5000
     # joinpath(@__DIR__, "..", "instances", "5000", "test",
@@ -75,13 +75,13 @@ seeds  = 1:10
 alphas = [0.3]
 
 # Number of GVNS iterations for the construction heuristics
-titer_construction = 50
+titer_construction = 20
 
 # Number of GRASP outer iterations (how many constructs + LS runs)
-niters_grasp = 50
+niters_grasp = 20
 
 # Output CSV
-out_csv = joinpath(@__DIR__, "results_11a.csv")
+out_csv = joinpath(@__DIR__, "results_11a_1000.csv")
 
 function run_construction_for_instance(filename::AbstractString;
                                        seeds,
