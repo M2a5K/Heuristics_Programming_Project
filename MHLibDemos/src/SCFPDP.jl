@@ -1659,42 +1659,83 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         end
 
     elseif alg == "vnd"
-        heuristic = GVNS(
-            sol,
-            [MHMethod("con", construct!)],
-            [
-                MHMethod("li1", local_improve!,
-                    LocalSearchParams(:relocate, lsparams.strategy, lsparams.use_delta)),
-                MHMethod("li2", local_improve!,
-                    LocalSearchParams(:inter_route, lsparams.strategy, lsparams.use_delta)),
-                MHMethod("li3", local_improve!,
-                    LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
-            ],
-            MHMethod[];
-            consider_initial_sol = true,
-            titer = titer,
-            scheduler_kwargs...,
-        )
+        if initsol !== nothing
+            copy!(sol, initsol)
+            heuristic = GVNS(
+                sol,
+                MHMethod[],
+                [
+                    MHMethod("li1", local_improve!,
+                        LocalSearchParams(:relocate, lsparams.strategy, lsparams.use_delta)),
+                    MHMethod("li2", local_improve!,
+                        LocalSearchParams(:inter_route, lsparams.strategy, lsparams.use_delta)),
+                    MHMethod("li3", local_improve!,
+                        LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
+                ],
+                MHMethod[];
+                consider_initial_sol = true,
+                titer = titer,
+                scheduler_kwargs...,
+            )
+        else
+            heuristic = GVNS(
+                sol,
+                [MHMethod("con", construct!)],
+                [
+                    MHMethod("li1", local_improve!,
+                        LocalSearchParams(:relocate, lsparams.strategy, lsparams.use_delta)),
+                    MHMethod("li2", local_improve!,
+                        LocalSearchParams(:inter_route, lsparams.strategy, lsparams.use_delta)),
+                    MHMethod("li3", local_improve!,
+                        LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
+                ],
+                MHMethod[];
+                consider_initial_sol = true,
+                titer = titer,
+                scheduler_kwargs...,
+            )
+        end
 
     elseif alg == "gen_vns"
-        heuristic = GVNS(
-            sol,
-            [MHMethod("con", construct!)],
-            [
-                MHMethod("li1", local_improve!,
-                    LocalSearchParams(:relocate, lsparams.strategy, lsparams.use_delta)),
-                MHMethod("li2", local_improve!,
-                    LocalSearchParams(:inter_route, lsparams.strategy, lsparams.use_delta)),
-                MHMethod("li3", local_improve!,
-                    LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
-            ],
-            # MHMethod[];
-            [MHMethod("sh1", shaking!, 1)];
+        if initsol !== nothing
+            copy!(sol, initsol)
+            heuristic = GVNS(
+                sol,
+                MHMethod[],
+                [
+                    MHMethod("li1", local_improve!,
+                        LocalSearchParams(:relocate, lsparams.strategy, lsparams.use_delta)),
+                    MHMethod("li2", local_improve!,
+                        LocalSearchParams(:inter_route, lsparams.strategy, lsparams.use_delta)),
+                    MHMethod("li3", local_improve!,
+                        LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
+                ],
+                [MHMethod("sh1", shaking!, 1)];
+    
+                consider_initial_sol = true,
+                titer = titer,
+                scheduler_kwargs...,
+            )
+        else
+            heuristic = GVNS(
+                sol,
+                [MHMethod("con", construct!)],
+                [
+                    MHMethod("li1", local_improve!,
+                        LocalSearchParams(:relocate, lsparams.strategy, lsparams.use_delta)),
+                    MHMethod("li2", local_improve!,
+                        LocalSearchParams(:inter_route, lsparams.strategy, lsparams.use_delta)),
+                    MHMethod("li3", local_improve!,
+                        LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
+                ],
+                # MHMethod[];
+                [MHMethod("sh1", shaking!, 1)];
 
-            consider_initial_sol = true,
-            titer = titer,
-            scheduler_kwargs...,
-        )
+                consider_initial_sol = true,
+                titer = titer,
+                scheduler_kwargs...,
+            )
+        end
 
     elseif alg == "grasp"
         niters = get(kwargs, :niters, 20)   # how many GRASP iterations
