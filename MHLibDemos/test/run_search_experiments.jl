@@ -8,6 +8,7 @@ using MHLibDemos: decompose_objective
 using Random
 using DataFrames
 using CSV
+using Glob
 
 function run_search_experiments(; 
         rootdir  = joinpath(@__DIR__, "..", "instances", "50", "train"),
@@ -18,17 +19,31 @@ function run_search_experiments(;
             "instance14_nreq50_nveh2_gamma45.txt",
             "instance27_nreq50_nveh2_gamma41.txt",
         ],
-        seeds   = 1:10,
-        alphas  = [0.0, 0.3, 0.7])
+        seeds   = 1:10)
 
     searchparams = [ [:two_opt, :inter_route, :relocate],
                      [:first_improvement, :best_improvement],
-                     [false, true] ]
+                     [false] ]
+    # exclude delta evaluations for now, as it is not implemented for all neighborhoods
 
     rows = NamedTuple[]
 
     for inst_file in inst_files
-        filename = joinpath(rootdir, inst_file)
+        filename_inst = joinpath(rootdir, inst_file)
+        inst_name_clean = replace(inst_file, ".txt" => "")
+        # filename_sol = joinpath(@__DIR__, "results", "solutions", "sol_$(inst_name_clean)_nn_det*.txt")
+
+        # Check if solution file exists and load it
+        sol_files = glob("sol_$(inst_name_clean)_nn_det*.txt", joinpath(@__DIR__, "results", "solutions"))
+        if !isempty(sol_files)
+            filename_sol = first(sol_files)
+            inst = SCFPDPInstance(filename_inst)
+            init_sol = read_solution(filename_sol, inst)
+        else
+            inst = SCFPDPInstance(filename_inst)
+            init_sol = SCFPDPSolution(inst)
+            construct_nn_det!(init_sol)
+        end
 
         for seed in seeds
             # --- local search ---
@@ -36,7 +51,7 @@ function run_search_experiments(;
                 for strategy in searchparams[2]
                     for use_delta in searchparams[3]
                         ls_params = MHLibDemos.LocalSearchParams(neighborhood, strategy, use_delta)
-                        sol, iters, time = solve_scfpdp("ls", filename; seed, ls_params)
+                        sol, iters, time = solve_scfpdp("ls", filename_inst; seed, lsparams=ls_params, initsol=init_sol)
                         t, fair, obj = decompose_objective(sol)
                         inst = sol.inst
 
@@ -48,7 +63,6 @@ function run_search_experiments(;
                             C               = inst.C,
                             rho             = inst.rho,
                             alg             = "ls",
-                            alpha           = NaN,
                             seed            = seed,
                             neighborhood    = neighborhood,
                             strategy        = strategy,
@@ -64,31 +78,35 @@ function run_search_experiments(;
             end
 
             # --- variable neighborhood descent (VND) ---
-            
-            # TODO to be implemented...
+            for strategy in searchparams[2]
+                for use_delta in searchparams[3]
+                    # the neighborhood does not matter here, because VND uses all of them;
+                    # still, we need to provide something to make the LocalSearchParams struct happy
+                    ls_params = MHLibDemos.LocalSearchParams(:two_opt, strategy, use_delta)
+                    sol, iters, time = solve_scfpdp("vnd", filename_inst; seed, lsparams=ls_params)
+                    t_r, f_r, o_r = decompose_objective(sol)
+                    inst = sol.inst  # same instance, but nice and explicit
 
-            # for α in alphas
-            #     sol, iters, time = solve_scfpdp("vnd", filename; seed, alpha=α)
-            #     t_r, f_r, o_r = decompose_objective(sol_rand)
-            #     inst = sol_rand.inst  # same instance, but nice and explicit
-
-            #     push!(rows, (; 
-            #         instance  = inst_file,
-            #         n         = inst.n,
-            #         nk        = inst.nk,
-            #         gamma     = inst.gamma,
-            #         C         = inst.C,
-            #         rho       = inst.rho,
-            #         alg       = "nn_rand",
-            #         alpha     = α,
-            #         seed      = seed,
-            #         total_time = t_r,
-            #         fairness   = f_r,
-            #         obj        = o_r,
-            #         iters      = iters,
-            #         time       = time,
-            #     ))
-            # end
+                    push!(rows, (; 
+                        instance        = inst_file,
+                        n               = inst.n,
+                        nk              = inst.nk,
+                        gamma           = inst.gamma,
+                        C               = inst.C,
+                        rho             = inst.rho,
+                        alg             = "vnd",
+                        seed            = seed,
+                        neighborhood    = :all,
+                        strategy        = strategy,
+                        use_delta       = use_delta,
+                        total_time      = t_r,
+                        fairness        = f_r,
+                        obj             = o_r,
+                        iters           = iters,
+                        runtime         = time,
+                    ))
+                end
+            end
         end
     end
 
@@ -103,5 +121,25 @@ function run_search_experiments(;
     println("Results saved to: $outfile")
     println(first(df, 10))  # show a small preview
 end
+
+
+function read_solution(filename::String, inst::SCFPDPInstance)
+    sol = SCFPDPSolution(inst)
+    open(filename, "r") do io
+        # first line points to instance file; parse the values found there
+        header = readline(io)
+        file_inst = joinpath(@__DIR__, "..", "instances", "50", "train", strip(header) * ".txt")
+        inst = SCFPDPInstance(file_inst)
+        sol = SCFPDPSolution(inst)
+        for (i, line) in enumerate(eachline(io))
+            if i == 1
+                continue
+            end
+            sol.routes[i-1] = parse.(Int, split(line))
+        end
+    end
+    return sol
+end
+
 
 # run_search_experiments()

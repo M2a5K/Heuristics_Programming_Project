@@ -1550,6 +1550,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
                       seed = nothing,
                       titer::Int = 1000,
                       lsparams::LocalSearchParams = LocalSearchParams(),
+                      initsol = nothing,
                       kwargs...)
 
     # require filename when using this helper
@@ -1631,17 +1632,31 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
             scheduler_kwargs...,
         )
 
-    elseif alg == "ls"        
-        heuristic = GVNS(
-            sol,
-            [MHMethod("con", construct!)],
-            [MHMethod("li1", local_improve!,
-                LocalSearchParams(lsparams.neighborhood, lsparams.strategy, lsparams.use_delta))],
-            MHMethod[];
-            consider_initial_sol = true,
-            titer = titer,
-            scheduler_kwargs...,
-        )
+    elseif alg == "ls"
+        if initsol !== nothing
+            copy!(sol, initsol)
+            heuristic = GVNS(
+                sol,
+                MHMethod[],
+                [MHMethod("li1", local_improve!,
+                    LocalSearchParams(lsparams.neighborhood, lsparams.strategy, lsparams.use_delta))],
+                MHMethod[];
+                consider_initial_sol = true,
+                titer = titer,
+                scheduler_kwargs...,
+            )
+        else
+            heuristic = GVNS(
+                sol,
+                [MHMethod("con", construct!)],
+                [MHMethod("li1", local_improve!,
+                    LocalSearchParams(lsparams.neighborhood, lsparams.strategy, lsparams.use_delta))],
+                MHMethod[];
+                consider_initial_sol = true,
+                titer = titer,
+                scheduler_kwargs...,
+            )
+        end
 
     elseif alg == "vnd"
         heuristic = GVNS(
