@@ -1682,7 +1682,7 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         )
 
     elseif alg == "grasp"
-        niters = get(kwargs, :niters, 50)   # how many GRASP iterations
+        niters = get(kwargs, :niters, 20)   # how many GRASP iterations
         alpha  = get(kwargs, :alpha, 0.3)   # same alpha as in construct_nn_rand!
         heuristic = Vector{GVNS}(undef, niters)
 
