@@ -236,11 +236,47 @@ function MHLib.calc_objective(s::SCFPDPSolution)
     end
     
     # Calculate fairness component using the Jain fairness measure
-    fairness = (total_time ^ 2) / (length(inst.nk) * sum(t^2 for t in route_times))
-    
+    # fairness = (total_time ^ 2) / (length(inst.nk) * sum(t^2 for t in route_times))
+   
+    m = inst.nk  # number of vehicles
+    denom = m * sum(t^2 for t in route_times)
+    fairness = denom == 0.0 ? 0.0 : (total_time ^ 2) / denom
+
+
     # Objective: minimize total time + rho * variance
     return total_time + inst.rho * (1 - fairness)
 end
+
+# function MHLib.calc_objective(s::SCFPDPSolution)
+#     inst = s.inst
+
+#     # If no requests are served, return a large penalty
+#     if !any(s.served)
+#         return Inf
+#     end
+
+#     # route times
+#     route_times = Float64[]
+#     total_time = 0.0
+#     for route in s.routes
+#         t = route_time(inst, route)
+#         push!(route_times, t)
+#         total_time += t
+#     end
+
+#     # No routes → meaningless objective
+#     if isempty(route_times)
+#         return Inf
+#     end
+
+#     # use same definition as in decompose_objective
+#     m = inst.nk  # number of vehicles (or use length(route_times))
+#     denom = m * sum(t^2 for t in route_times)
+#     fairness = denom == 0.0 ? 0.0 : total_time^2 / denom
+
+#     return total_time + inst.rho * (1 - fairness)
+# end
+
 
 """
     initialize!(s::SCFPDPSolution)
@@ -1393,6 +1429,101 @@ function construct_pilot!(s::SCFPDPSolution)
     return s
 end
 
+# following TSP random_two_exchange_moves!.
+"""
+    random_shake!(s, par)
+
+Simple shaking for GVNS:
+try up to `par` random relocate moves between vehicles
+to perturb the current solution.
+"""
+function random_shake!(s::SCFPDPSolution, par::Int)
+    inst = s.inst
+
+    for _ in 1:par
+        # Work on a temporary copy; only commit if feasible
+        tmp = copy(s)
+
+        # 1) Choose a source route with at least one pickup
+        k1_candidates = Int[]
+        for k in 1:inst.nk
+            route = tmp.routes[k]
+            # route must contain at least one pickup node (non-depot)
+            has_pickup = any(begin
+                r, is_pickup = node_to_request(inst, node)
+                is_pickup && r != 0
+            end for node in route)
+            has_pickup && push!(k1_candidates, k)
+        end
+        isempty(k1_candidates) && continue
+
+        k1 = rand(k1_candidates)
+        route1 = tmp.routes[k1]
+
+        # 2) Pick a random pickup in route1
+        pickup_indices = Int[]
+        for (idx, node) in enumerate(route1)
+            r, is_pickup = node_to_request(inst, node)
+            is_pickup && r != 0 && push!(pickup_indices, idx)
+        end
+        isempty(pickup_indices) && continue
+
+        idx_pickup = rand(pickup_indices)
+        r, _ = node_to_request(inst, route1[idx_pickup])
+        pickup_node  = inst.pickup[r]
+        dropoff_node = inst.dropoff[r]
+
+        idx_dropoff = findfirst(==(dropoff_node), route1)
+        idx_dropoff === nothing && continue
+
+        # 3) Remove pickup+dropoff from route1 (on tmp)
+        # Always delete the higher index first to avoid shifting issues
+        if idx_dropoff > idx_pickup
+            deleteat!(route1, idx_dropoff)
+            deleteat!(route1, idx_pickup)
+        else
+            deleteat!(route1, idx_pickup)
+            deleteat!(route1, idx_dropoff)
+        end
+
+        # 4) Choose target route (can be same or different)
+        k2 = rand(1:inst.nk)
+        route2 = tmp.routes[k2]
+
+        # Sample insertion positions based on CURRENT length of route2
+        len2 = length(route2)
+        # pickup can go anywhere 1..len2+1
+        pickup_pos  = rand(1:len2 + 1)
+        # dropoff must come after pickup, so in [pickup_pos+1 .. len2+2]
+        dropoff_pos = rand(pickup_pos + 1:len2 + 2)
+
+        # 5) Insert into target route
+        insert!(route2, pickup_pos,  pickup_node)
+        insert!(route2, dropoff_pos, dropoff_node)
+
+        # 6) If shaken solution is feasible → keep it, else discard
+        if is_feasible(tmp)
+            copy!(s, tmp)
+            s.obj_val_valid = false
+        end
+        # if infeasible, do nothing (we just ignore this shake)
+    end
+
+    return s
+end
+
+
+"""
+    shaking!(s, par, result)
+
+GVNS shaking wrapper for SCFPDP.
+"""
+function MHLib.shaking!(s::SCFPDPSolution, par::Int, result::Result)
+    random_shake!(s, par)
+    result.changed = true
+end
+
+
 
 
 
@@ -1525,6 +1656,26 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
                     LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
             ],
             MHMethod[];
+            consider_initial_sol = true,
+            titer = titer,
+            scheduler_kwargs...,
+        )
+
+    elseif alg == "gen_vns"
+        heuristic = GVNS(
+            sol,
+            [MHMethod("con", construct!)],
+            [
+                MHMethod("li1", local_improve!,
+                    LocalSearchParams(:relocate, lsparams.strategy, lsparams.use_delta)),
+                MHMethod("li2", local_improve!,
+                    LocalSearchParams(:inter_route, lsparams.strategy, lsparams.use_delta)),
+                MHMethod("li3", local_improve!,
+                    LocalSearchParams(:two_opt, lsparams.strategy, lsparams.use_delta)),
+            ],
+            # MHMethod[];
+            [MHMethod("sh1", shaking!, 1)];
+
             consider_initial_sol = true,
             titer = titer,
             scheduler_kwargs...,
