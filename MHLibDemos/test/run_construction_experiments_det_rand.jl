@@ -36,7 +36,6 @@ function run_construction_experiments(;
 
     rows = NamedTuple[]
 
-    # Combine everything
     all_instances = vcat(
         [(root50, f) for f in inst50]...,
         [(root200, f) for f in inst200]...
@@ -47,7 +46,7 @@ function run_construction_experiments(;
 
         for seed in seeds
 
-            # ---- deterministic ----
+            # deterministic
             sol_det, iters, time = solve_scfpdp("nn_det", filename; seed)
             t_det, fair_det, obj_det = decompose_objective(sol_det)
             inst = sol_det.inst
@@ -69,7 +68,7 @@ function run_construction_experiments(;
                 runtime    = time,
             ))
 
-            # ---- randomized for α ----
+            # randomized for α 
             for α in alphas
                 sol_rand, iters, time = solve_scfpdp("nn_rand", filename; seed, alpha=α)
                 t_r, f_r, o_r = decompose_objective(sol_rand)
@@ -100,7 +99,7 @@ function run_construction_experiments(;
     outdir = joinpath(@__DIR__, "results")
     mkpath(outdir)
 
-    outfile = joinpath(outdir, "construction_results_experiments1.csv")
+    outfile = joinpath(outdir, "construction_results_experiments_det_rand.csv")
     CSV.write(outfile, df)
 
     println("Results saved to: $outfile")

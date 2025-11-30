@@ -94,9 +94,7 @@ function run_construction_for_instance(filename::AbstractString;
     rows = NamedTuple[]
 
     for seed in seeds
-        # -------------------------------
         # Deterministic NN construction
-        # -------------------------------
         sol_det, it_det, rt_det = MHLibDemos.solve_scfpdp(
             "nn_det",
             filename;
@@ -114,7 +112,7 @@ function run_construction_for_instance(filename::AbstractString;
                       C          = inst.C,
                       rho        = inst.rho,
                       alg        = "nn_det",
-                      alpha      = NaN,         # not used
+                      alpha      = NaN,  
                       seed       = seed,
                       total_time = t_det,
                       fairness   = fair_det,
@@ -122,9 +120,7 @@ function run_construction_for_instance(filename::AbstractString;
                       iterations = it_det,
                       runtime    = rt_det))
 
-        # -------------------------------
         # Randomized NN construction
-        # -------------------------------
         for α in alphas
             sol_rand, it_rand, rt_rand = MHLibDemos.solve_scfpdp(
                 "nn_rand",
@@ -153,9 +149,7 @@ function run_construction_for_instance(filename::AbstractString;
                           runtime    = rt_rand))
         end
 
-        # -------------------------------
         # GRASP (NN-rand + local search)
-        # -------------------------------
         for α in alphas
             sol_grasp, it_grasp, rt_grasp = MHLibDemos.solve_scfpdp(
                 "grasp",
@@ -192,10 +186,6 @@ function run_construction_for_instance(filename::AbstractString;
     return rows
 end
 
-# -----------------------------------------------------
-# Main: loop over all chosen instances
-# -----------------------------------------------------
-
 function run11a()
     all_rows = NamedTuple[]
 
@@ -228,4 +218,4 @@ function run11a()
     println(df)
 end
 
-# run11a()
+run11a()
