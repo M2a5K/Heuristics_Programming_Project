@@ -7,6 +7,8 @@ using Random
 using DataFrames
 using CSV
 
+export run11a
+
 # Picking 6 instances (all from folder "test")
 instances = [
     # size 50
@@ -194,7 +196,7 @@ end
 # Main: loop over all chosen instances
 # -----------------------------------------------------
 
-function main()
+function run11a()
     all_rows = NamedTuple[]
 
     for filename in instances
@@ -226,4 +228,4 @@ function main()
     println(df)
 end
 
-main()
+# run11a()
