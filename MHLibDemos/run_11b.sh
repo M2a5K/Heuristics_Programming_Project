@@ -1,10 +1,10 @@
 #!/bin/bash
-#$ -N construction_experiments
+#$ -N search_experiments
 #$ -j y
-#$ -o construction_experiments.log
+#$ -o search_experiments.log
 #$ -l h_rt=00:15:00
 
-# Submit with: qsub run_11a.sh
+# Submit with: qsub run_11b.sh
 
 # Load Julia module (adjust version as needed for your cluster)
 # module load julia/1.11.0
@@ -19,7 +19,7 @@ julia --project="$MHLIBDEMOS_DIR" -e "
 using Pkg
 Pkg.instantiate()
 using MHLibDemos
-run11a()
+run11b()
 "
 
-echo "Construction experiments completed"
+echo "Search experiments completed"

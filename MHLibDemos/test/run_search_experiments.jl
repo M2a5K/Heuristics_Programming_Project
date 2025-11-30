@@ -38,7 +38,7 @@ function run_search_experiments(;
         if !isempty(sol_files)
             filename_sol = first(sol_files)
             inst = SCFPDPInstance(filename_inst)
-            init_sol = read_solution(filename_sol, inst)
+            init_sol = read_solution(filename_sol, inst, "train")
         else
             inst = SCFPDPInstance(filename_inst)
             init_sol = SCFPDPSolution(inst)
@@ -84,7 +84,7 @@ function run_search_experiments(;
                     # still, we need to provide something to make the LocalSearchParams struct happy
                     ls_params = MHLibDemos.LocalSearchParams(:two_opt, strategy, use_delta)
                     sol, iters, time = solve_scfpdp("vnd", filename_inst; seed, lsparams=ls_params)
-                    t_r, f_r, o_r = decompose_objective(sol)
+                    t, fair, obj = decompose_objective(sol)
                     inst = sol.inst  # same instance, but nice and explicit
 
                     push!(rows, (; 
@@ -99,9 +99,9 @@ function run_search_experiments(;
                         neighborhood    = :all,
                         strategy        = strategy,
                         use_delta       = use_delta,
-                        total_time      = t_r,
-                        fairness        = f_r,
-                        obj             = o_r,
+                        total_time      = t,
+                        fairness        = fair,
+                        obj             = obj,
                         iters           = iters,
                         runtime         = time,
                     ))
@@ -123,12 +123,15 @@ function run_search_experiments(;
 end
 
 
-function read_solution(filename::String, inst::SCFPDPInstance)
+function read_solution(filename::String, inst::SCFPDPInstance, type::String="train")
     sol = SCFPDPSolution(inst)
     open(filename, "r") do io
         # first line points to instance file; parse the values found there
         header = readline(io)
-        file_inst = joinpath(@__DIR__, "..", "instances", "50", "train", strip(header) * ".txt")
+        instance_name = strip(header)
+        nreq_match = match(r"nreq(\d+)", instance_name)
+        nreq = nreq_match.captures[1]
+        file_inst = joinpath(@__DIR__, "..", "instances", nreq, type, instance_name * ".txt")
         inst = SCFPDPInstance(file_inst)
         sol = SCFPDPSolution(inst)
         for (i, line) in enumerate(eachline(io))

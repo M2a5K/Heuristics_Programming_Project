@@ -62,8 +62,10 @@ include("TSP.jl")
 include("SCFPDP.jl")
 
 include("../test/tests.jl")
-# include("../test/run_construction_experiments.jl")
-# include("../test/run_search_experiments.jl")
-# include("../test/run_11a.jl")
+include("../test/run_construction_experiments_det_rand.jl")
+include("../test/run_search_experiments.jl")
+include("../test/run_11a.jl")
+include("../test/run_11b.jl")
+include("../test/run_competition.jl")
 
 end  # module

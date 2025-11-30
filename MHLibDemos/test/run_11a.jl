@@ -10,7 +10,7 @@ using CSV
 export run11a
 
 # Picking 6 instances (all from folder "test")
-instances = [
+instances_test = [
     # # size 50
     # joinpath(@__DIR__, "..", "instances", "50", "test",
     #          "instance31_nreq50_nveh2_gamma50.txt"),
@@ -189,7 +189,7 @@ end
 function run11a()
     all_rows = NamedTuple[]
 
-    for filename in instances
+    for filename in instances_test
         println("\n===============================")
         println("Running construction experiments on:")
         println("  $(filename)")
@@ -218,4 +218,4 @@ function run11a()
     println(df)
 end
 
-run11a()
+# run11a()
