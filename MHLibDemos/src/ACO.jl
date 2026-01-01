@@ -1,0 +1,190 @@
+include("SCFPDP.jl")
+
+using StatsBase
+
+# pheromones : initial pheromone level
+function init_tau(inst::SCFPDPInstance; tau0::Float64 = 1.0)
+    return fill(tau0, inst.n, inst.nk)
+end
+
+# previous evaporation
+function evaporate!(tau::Matrix{Float64}; rho::Float64 = 0.1)
+    tau .*= (1.0 - rho)
+    return tau
+end
+
+# candidate list : ants create a solution : here what ant is allowed to do next
+# N_i^k feasible (request r, vehicle k) insertions
+function aco_candidates(s::SCFPDPSolution, remaining::Vector{Int})
+    inst = s.inst
+    base_obj = MHLib.calc_objective(s) 
+    candidates = Tuple{Float64,Int,Int}[]
+
+    for r in remaining
+        for k in 1:inst.nk
+            tmp = copy(s)
+            append_request!(tmp, k, r)
+            is_feasible(tmp) || continue
+
+            # local informaiton: heuristics step 1 page 106 lecture notes
+            new_obj = MHLib.calc_objective(tmp)
+            Δ = new_obj - base_obj
+            push!(candidates, (Δ, r, k)) # candidate evaluation for later probabilitic selection
+        end
+    end
+    return candidates
+end
+
+# local information η is defined analogously to TSP visibility from lecture notes: 
+# inverse objective increase caused by inserting a request into a vehicle route + small eps to avoid division by zero
+
+
+# helper: normalize a probability vector in-place ∑​τilα​⋅ηilβ​ (denominator of probability formula)
+function normalize_probs!(p::Vector{Float64})
+    s = sum(p)
+    if !(s > 0.0) || !isfinite(s)
+        fill!(p, 1.0 / length(p))
+    else
+        for i in eachindex(p)
+            p[i] /= s
+        end
+    end
+    return p
+end
+
+function aco_probs(candidates, tau::Matrix{Float64};
+                   alpha::Float64 = 1.0,
+                   beta::Float64  = 3.0,
+                   eps::Float64   = 1e-9)
+
+    p = Float64[]
+    for (Δ, r, k) in candidates
+        η = 1.0 / (Δ + eps)
+        # combine pheromone τ and local information η with parameters alpha and beta τijα​⋅ηijβ​
+        score = (tau[r, k]^alpha) * (η^beta)
+        push!(p, score)
+    end
+    return normalize_probs!(p)
+end
+
+
+# pheromone deposit page 109
+function deposit_pheromones!(tau::Matrix{Float64},
+                             sols;         
+                             Q::Float64 = 1.0,
+                             eps::Float64 = 1e-9)
+
+    for (components, obj_val) in sols
+        Δτ = Q / (obj_val + eps)
+
+        for (r, k) in components
+            tau[r, k] += Δτ
+        end
+    end
+
+    return tau
+end
+
+# evaporate + deposit pheromones -> τ(t+1)=(1−ρ)τ(t)+Δτ(t) 
+
+# Procedure AS
+
+
+
+function sample_candidate(candidates, probs)
+    idx = sample(1:length(candidates), Weights(probs))
+    return candidates[idx]  # (Δ, r, k)
+end
+
+function apply_candidate!(s::SCFPDPSolution, r::Int, k::Int)
+    append_request!(s, k, r)
+    return s
+end
+
+
+function construct_aco_ant!(s::SCFPDPSolution, tau::Matrix{Float64};
+                           alpha::Float64 = 1.0,
+                           beta::Float64  = 3.0,
+                           eps::Float64   = 1e-9)
+
+    inst = s.inst
+    initialize!(s)
+
+    remaining = collect(1:inst.n)
+    components = Tuple{Int,Int}[] 
+
+    while count(s.served) < inst.gamma && !isempty(remaining)
+        candidates = aco_candidates(s, remaining)
+        isempty(candidates) && break
+
+        probs = aco_probs(candidates, tau; alpha=alpha, beta=beta, eps=eps)
+        (Δ, r, k) = sample_candidate(candidates, probs)
+
+        apply_candidate!(s, r, k)
+        push!(components, (r, k))
+
+        pos = findfirst(==(r), remaining)
+        pos === nothing || deleteat!(remaining, pos)
+    end
+
+    s.obj_val = MHLib.calc_objective(s)
+    s.obj_val_valid = true
+
+    return components
+end
+
+
+function run_aco!(sol::SCFPDPSolution;
+                  num_ants::Int = 30,
+                  alpha::Float64 = 1.0,
+                  beta::Float64 = 3.0,
+                  rho::Float64 = 0.1,
+                  ttime::Float64 = 10.0,
+                  seed::Int = 1,
+                  tau0::Float64 = 1.0,
+                  Q::Float64 = 1.0,
+                  eps::Float64 = 1e-9)
+
+    inst = sol.inst
+    Random.seed!(seed)
+
+    # initialize pheromones
+    tau = init_tau(inst; tau0=tau0)
+
+    # keep best solution found
+    best_val = Inf
+    best_sol = nothing
+
+    start = time()
+    iters = 0
+
+    while (time() - start) < ttime
+        sols = Tuple{Vector{Tuple{Int,Int}}, Float64}[]
+
+        # for each ant: construct a solution
+        for _ in 1:num_ants
+            s = SCFPDPSolution(inst)
+            comps = construct_aco_ant!(s, tau; alpha=alpha, beta=beta, eps=eps)
+
+            push!(sols, (comps, s.obj_val))
+
+            if s.obj_val < best_val
+                best_val = s.obj_val
+                best_sol = copy(s)
+            end
+        end
+
+        # pheromone update: evaporate + deposit
+        evaporate!(tau; rho=rho)
+        deposit_pheromones!(tau, sols; Q=Q, eps=eps)
+
+        iters += 1
+    end
+
+    best_sol === nothing && error("ACO failed to build any solution.")
+
+    # write best back into the provided 'sol'
+    copy!(sol, best_sol)
+
+    return sol, (iters=iters, best_val=best_val, time=time()-start)
+end
