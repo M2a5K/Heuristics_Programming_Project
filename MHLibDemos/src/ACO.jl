@@ -53,6 +53,25 @@ function normalize_probs!(p::Vector{Float64})
     return p
 end
 
+# function aco_probs(candidates, tau::Matrix{Float64};
+#                    alpha::Float64 = 1.0,
+#                    beta::Float64  = 3.0,
+#                    eps::Float64   = 1e-9)
+
+#     p = Float64[]
+#     for (Δ, r, k) in candidates
+#         # η = 1.0 / (Δ + eps)
+#         # η = 1.0 / (max(Δ, 0.0) + eps)
+#         Δpos = max(Δ, 0.0)
+#         η = 1.0 / (Δpos + eps)
+
+#         # combine pheromone τ and local information η with parameters alpha and beta τijα​⋅ηijβ​
+#         score = (tau[r, k]^alpha) * (η^beta)
+#         push!(p, score)
+#     end
+#     return normalize_probs!(p)
+# end
+
 function aco_probs(candidates, tau::Matrix{Float64};
                    alpha::Float64 = 1.0,
                    beta::Float64  = 3.0,
@@ -60,13 +79,14 @@ function aco_probs(candidates, tau::Matrix{Float64};
 
     p = Float64[]
     for (Δ, r, k) in candidates
-        η = 1.0 / (Δ + eps)
-        # combine pheromone τ and local information η with parameters alpha and beta τijα​⋅ηijβ​
+        Δpos = max(Δ, 0.0)          # we dont get negative increases
+        η = 1.0 / (Δpos + eps)
         score = (tau[r, k]^alpha) * (η^beta)
         push!(p, score)
     end
     return normalize_probs!(p)
 end
+
 
 
 # pheromone deposit page 109
@@ -258,6 +278,92 @@ end
 
 #     return sol, (iters=iters, best_val=best_val, time=time()-start)
 # end
+
+
+
+# function run_aco!(sol::SCFPDPSolution;
+#                   num_ants::Int = 30,
+#                   alpha::Float64 = 1.0,
+#                   beta::Float64 = 3.0,
+#                   rho::Float64 = 0.1,
+#                   ttime::Float64 = 10.0,
+#                   seed::Int = 1,
+#                   tau0::Float64 = 1.0,
+#                   Q::Float64 = 1.0,
+#                   eps::Float64 = 1e-9,
+#                   do_local_improve::Bool = true,
+#                   improve_only_best_ant::Bool = true)
+
+#     inst = sol.inst
+#     Random.seed!(seed)
+
+#     tau = init_tau(inst; tau0=tau0)
+
+#     best_val = Inf
+#     best_sol = nothing
+
+#     start = time()
+#     iters = 0
+
+#     while (time() - start) < ttime
+#         sols = Tuple{Vector{Tuple{Int,Int}}, Float64}[]
+#         iter_best_s = nothing
+#         iter_best_val = Inf
+
+#         ants = Vector{SCFPDPSolution}(undef, num_ants)
+
+#         # 1) Construct solutions
+#         for a in 1:num_ants
+#             s = SCFPDPSolution(inst)
+#             construct_aco_ant!(s, tau; alpha=alpha, beta=beta, eps=eps)
+#             ants[a] = s
+
+#             if s.obj_val < iter_best_val
+#                 iter_best_val = s.obj_val
+#                 iter_best_s = s
+#             end
+#         end
+
+#         # 2) Optional local improvement
+#         if do_local_improve
+#             if improve_only_best_ant
+#                 # improve just the iteration-best 
+#                 local_improve_vnd!(iter_best_s; strategy=:first_improvement, use_delta=false, max_rounds=10)
+#             else
+#                 # improve all ants 
+#                 for s in ants
+#                     local_improve_vnd!(s; strategy=:first_improvement, use_delta=false, max_rounds=10)
+#                 end
+#             end
+#         end
+
+#         # 3) Collect deposit info 
+#         for s in ants
+#             comps = extract_components(s)
+#             push!(sols, (comps, s.obj_val))
+
+#             if s.obj_val < best_val
+#                 best_val = s.obj_val
+#                 best_sol = copy(s)
+#             end
+#         end
+
+#         # 4) Update pheromones
+#         evaporate!(tau; rho=rho)
+#         # deposit_pheromones!(tau, sols; Q=Q, eps=eps)
+#         deposit_pheromones_best!(tau, sols; Q=Q, eps=eps)
+
+
+#         iters += 1
+#     end
+
+#     best_sol === nothing && error("ACO failed to build any solution.")
+
+#     copy!(sol, best_sol)
+#     return sol, (iters=iters, best_val=best_val, time=time()-start)
+# end
+
+
 function run_aco!(sol::SCFPDPSolution;
                   num_ants::Int = 30,
                   alpha::Float64 = 1.0,
@@ -268,8 +374,11 @@ function run_aco!(sol::SCFPDPSolution;
                   tau0::Float64 = 1.0,
                   Q::Float64 = 1.0,
                   eps::Float64 = 1e-9,
-                  do_local_improve::Bool = true,
-                  improve_only_best_ant::Bool = true)
+                  lsparams::Union{Nothing,LocalSearchParams} = nothing,
+                  ls_iters::Int = 0,
+                  # pheromone bounds needed? 
+                  tau_min::Float64 = 1e-4,
+                  tau_max::Float64 = 10.0)
 
     inst = sol.inst
     Random.seed!(seed)
@@ -284,40 +393,39 @@ function run_aco!(sol::SCFPDPSolution;
 
     while (time() - start) < ttime
         sols = Tuple{Vector{Tuple{Int,Int}}, Float64}[]
-        iter_best_s = nothing
-        iter_best_val = Inf
 
-        ants = Vector{SCFPDPSolution}(undef, num_ants)
-
-        # 1) Construct solutions
-        for a in 1:num_ants
+        for _ in 1:num_ants
             s = SCFPDPSolution(inst)
+
+            # construct one ant
             construct_aco_ant!(s, tau; alpha=alpha, beta=beta, eps=eps)
-            ants[a] = s
 
-            if s.obj_val < iter_best_val
-                iter_best_val = s.obj_val
-                iter_best_s = s
+            # optional local search
+            # if lsparams !== nothing && ls_iters > 0
+            #     r = MHLib.Result()
+            #     for _ls in 1:ls_iters
+            #         MHLib.local_improve!(s, lsparams, r)
+            #         r.changed || break
+            #         r.changed = false
+            #     end
+            #     s.obj_val = MHLib.calc_objective(s)
+            #     s.obj_val_valid = true
+            # end
+            # 2) optional local search (VND: relocate + inter_route + two_opt)
+            if lsparams !== nothing && ls_iters > 0
+                # interpret ls_iters as number of VND rounds
+                local_improve_vnd!(
+                    s;
+                    strategy = :first_improvement,
+                    use_delta = false,
+                    max_rounds = ls_iters
+                )
             end
-        end
 
-        # 2) Optional local improvement
-        if do_local_improve
-            if improve_only_best_ant
-                # improve just the iteration-best 
-                local_improve_vnd!(iter_best_s; strategy=:first_improvement, use_delta=false, max_rounds=10)
-            else
-                # improve all ants 
-                for s in ants
-                    local_improve_vnd!(s; strategy=:first_improvement, use_delta=false, max_rounds=10)
-                end
-            end
-        end
 
-        # 3) Collect deposit info 
-        for s in ants
-            comps = extract_components(s)
-            push!(sols, (comps, s.obj_val))
+            # IMPORTANT deposit components after local search
+            final_comps = extract_components(s)
+            push!(sols, (final_comps, s.obj_val))
 
             if s.obj_val < best_val
                 best_val = s.obj_val
@@ -325,17 +433,22 @@ function run_aco!(sol::SCFPDPSolution;
             end
         end
 
-        # 4) Update pheromones
         evaporate!(tau; rho=rho)
-        # deposit_pheromones!(tau, sols; Q=Q, eps=eps)
         deposit_pheromones_best!(tau, sols; Q=Q, eps=eps)
 
+        @inbounds for i in eachindex(tau)
+            if tau[i] < tau_min
+                tau[i] = tau_min
+            elseif tau[i] > tau_max
+                tau[i] = tau_max
+            end
+        end
 
         iters += 1
     end
 
     best_sol === nothing && error("ACO failed to build any solution.")
-
     copy!(sol, best_sol)
+
     return sol, (iters=iters, best_val=best_val, time=time()-start)
 end

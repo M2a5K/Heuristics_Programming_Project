@@ -1737,6 +1737,55 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
             )
         end
 
+
+    # ASSIGNMENT PART2: solving with ACO 
+    elseif alg == "aco"
+    num_ants = get(kwargs, :num_ants, 5)
+    aco_alpha = get(kwargs, :aco_alpha, 1.0)
+    aco_beta  = get(kwargs, :aco_beta, 3.0)
+    aco_rho   = get(kwargs, :aco_rho, 0.1)
+    aco_tau0  = get(kwargs, :aco_tau0, 1.0)
+    aco_Q     = get(kwargs, :aco_Q, 1.0)
+    aco_seed  = get(kwargs, :aco_seed, seed)  
+
+    aco_ttime = get(kwargs, :aco_ttime, get(kwargs, :ttime, 2.0))
+
+    # optional: local search inside ACO
+    aco_ls_iters = get(kwargs, :aco_ls_iters, 0)
+    aco_lsparams = get(kwargs, :aco_lsparams, nothing)  # pass a LocalSearchParams or nothing
+
+    heuristic = GVNS(
+        sol,
+        [MHMethod("aco_con",
+            (s, _, r) -> begin
+            MHLib.initialize!(s) 
+            s.obj_val_valid = false
+
+                run_aco!(s;
+                    num_ants=num_ants,
+                    alpha=aco_alpha,
+                    beta=aco_beta,
+                    rho=aco_rho,
+                    ttime=aco_ttime,
+                    seed=aco_seed,
+                    tau0=aco_tau0,
+                    Q=aco_Q,
+                    lsparams=aco_lsparams,
+                    ls_iters=aco_ls_iters
+                )
+                s.obj_val = MHLib.calc_objective(s)
+                s.obj_val_valid = true
+                r.changed = true
+            end
+        )],
+        MHMethod[],   # no extra local search here (can be added)
+        MHMethod[];
+        consider_initial_sol = false,
+        titer = 1,     # important: ACO already loops internally; 1 call is enough and it always print 1 iter 
+        scheduler_kwargs...,
+    )
+
+
     elseif alg == "grasp"
         niters = get(kwargs, :niters, 20)   # how many GRASP iterations
         alpha  = get(kwargs, :alpha, 0.3)   # same alpha as in construct_nn_rand!
