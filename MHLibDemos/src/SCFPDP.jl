@@ -13,6 +13,15 @@ using MHLib
 
 export SCFPDPInstance, SCFPDPSolution, solve_scfpdp
 
+# Fairness measures switch (Task 2 Assignment 2)
+const FAIRNESS_MEASURE = Ref{Symbol}(:jain)  # :jain, :maxmin, :gini
+
+"Set fairness measure globally. Use :jain for all later tasks."
+set_fairness!(m::Symbol) = (FAIRNESS_MEASURE[] = m)
+
+get_fairness() = FAIRNESS_MEASURE[]
+
+
 
 """
     SCFPDPInstance
@@ -239,9 +248,11 @@ function MHLib.calc_objective(s::SCFPDPSolution)
     # fairness = (total_time ^ 2) / (length(inst.nk) * sum(t^2 for t in route_times))
    
     m = inst.nk  # number of vehicles
-    denom = m * sum(t^2 for t in route_times)
-    fairness = denom == 0.0 ? 0.0 : (total_time ^ 2) / denom
+    # denom = m * sum(t^2 for t in route_times)
+    # fairness = denom == 0.0 ? 0.0 : (total_time ^ 2) / denom
 
+    # Assignment 2 Task 2 
+    fairness = fairness_value(route_times)
 
     # Objective: minimize total time + rho * variance
     return total_time + inst.rho * (1 - fairness)
@@ -1152,6 +1163,56 @@ function is_feasible(s::SCFPDPSolution)
 end
 
 
+"""
+Assignment 2 Task 2 
+Compute fairness F in [0,1] from per-vehicle route times d(R_k).
+We interpret d(R_k) as the travel time of route k incl. depot legs.
+"""
+function fairness_value(route_times::Vector{Float64}; measure::Symbol = FAIRNESS_MEASURE[])
+    m = length(route_times)
+    m == 0 && return 0.0
+
+    if measure == :jain
+        s = sum(route_times)
+        denom = m * sum(t^2 for t in route_times)
+        return denom == 0.0 ? 0.0 : (s^2) / denom
+    elseif measure == :maxmin
+        mx = maximum(route_times)
+        mn = minimum(route_times)
+        return mx <= 0.0 ? 0.0 : mn / mx
+    elseif measure == :gini
+        s = sum(route_times)
+        s <= 0.0 && return 0.0
+        num = 0.0
+        @inbounds for i in 1:m
+            xi = route_times[i]
+            for j in 1:m
+                num += abs(xi - route_times[j])
+            end
+        end
+        denom = 2.0 * m * s
+        g = 1.0 - (num / denom)
+        return clamp(g, 0.0, 1.0)
+    else
+        error("Unknown fairness measure: $measure (use :jain, :maxmin, :gini)")
+    end
+end
+
+"Compute per-vehicle route times vector [d(R_1), ..., d(R_|K|)]."
+function route_times_vec(s::SCFPDPSolution)
+    inst = s.inst
+    rt = Float64[]
+    for route in s.routes
+        push!(rt, float(route_time(inst, route)))
+    end
+    return rt
+end
+
+"Stops per route (counts nodes; pickup and dropoff are each a stop)."
+stops_per_route(s::SCFPDPSolution) = [length(r) for r in s.routes]
+
+
+
 
 """
     construct_nn_det!(s)
@@ -1925,8 +1986,13 @@ function decompose_objective(s::SCFPDPSolution)
     # Number of vehicles (or use length(route_times) if you prefer only active ones)
     m = inst.nk
 
-    denom = m * sum(t^2 for t in route_times)
-    fairness = denom == 0.0 ? 0.0 : total_time^2 / denom
+    # denom = m * sum(t^2 for t in route_times)
+    # fairness = denom == 0.0 ? 0.0 : total_time^2 / denom
+
+    # Asignment 2 Task 2
+    fairness = fairness_value(route_times)
+
+
 
     obj = total_time + inst.rho * (1 - fairness)
 
