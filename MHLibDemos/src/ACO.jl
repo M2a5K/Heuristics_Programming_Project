@@ -72,20 +72,41 @@ end
 #     return normalize_probs!(p)
 # end
 
+# function aco_probs(candidates, tau::Matrix{Float64};
+#                    alpha::Float64 = 1.0,
+#                    beta::Float64  = 3.0,
+#                    eps::Float64   = 1e-9)
+
+#     p = Float64[]
+#     for (Δ, r, k) in candidates
+#         Δpos = max(Δ, 0.0)          # we dont get negative increases
+#         η = 1.0 / (Δpos + eps)
+#         score = (tau[r, k]^alpha) * (η^beta)
+#         push!(p, score)
+#     end
+#     return normalize_probs!(p)
+# end
 function aco_probs(candidates, tau::Matrix{Float64};
                    alpha::Float64 = 1.0,
                    beta::Float64  = 3.0,
                    eps::Float64   = 1e-9)
 
+    # shift deltas so the best delta becomes 0
+    Δmin = minimum(c[1] for c in candidates)
+
     p = Float64[]
     for (Δ, r, k) in candidates
-        Δpos = max(Δ, 0.0)          # we dont get negative increases
-        η = 1.0 / (Δpos + eps)
+        # shifted delta is always >= 0
+        Δshift = (Δ - Δmin)
+        η = 1.0 / (Δshift + eps)
+
         score = (tau[r, k]^alpha) * (η^beta)
         push!(p, score)
     end
+
     return normalize_probs!(p)
 end
+
 
 
 

@@ -7,11 +7,11 @@
 ## value on the command line).
 
 ## Directory where the programs will be run.
-# execDir = "./"
+execDir = "./"
 
 ## File that contains the description of the parameters of the target
 ## algorithm.
-# parameterFile = "./parameters.txt"
+parameterFile = "./parameters.txt"
 
 ## File that contains a table of initial configurations. If empty or `NULL`,
 ## all initial configurations are randomly generated.
@@ -29,7 +29,8 @@
 ## File that contains a list of training instances and optionally additional
 ## parameters for them. If `trainInstancesDir` is provided, `irace` will
 ## search for the files in this folder.
-trainInstancesFile = "instances-list.txt"
+
+trainInstancesFile = "instances-list-50.txt"
 
 ## Randomly sample the training instances or use them in the order given.
 # sampleInstances = 1
@@ -59,21 +60,22 @@ trainInstancesFile = "instances-list.txt"
 
 ## Number of instances evaluated before the first elimination test. It must be
 ## a multiple of `eachTest`.
-# firstTest = 5
+# firstTest = 3
 
 ## Number of training instances, that make up a `block' in
 ## `trainInstancesFile`. Elimination of configurations will only be performed
 ## after evaluating a complete block and never in the middle of a block. Each
 ## block typically contains one instance from each instance class (type or
 ## family) and the block size is the number of classes.
-# blockSize = 1
+blockSize = 1
 
 ## Number of instances evaluated between elimination tests.
-# eachTest = 1
+eachTest = 1
 
 ## Executable called for each configuration that executes the target algorithm
 ## to be tuned. See the templates and examples provided.
-# targetRunner = "./target-runner"
+targetRunner = "./target-runner"
+
 
 ## Executable that will be used to launch the target runner, when
 ## `targetRunner` cannot be executed directly (e.g., a Python script in
@@ -89,6 +91,7 @@ trainInstancesFile = "instances-list.txt"
 ## `{targetRunner}`, if present, will be replaced by the value of
 ## `targetRunner` (useful when using `targetRunnerLauncher`).
 # targetCmdline = "{configurationID} {instanceID} {seed} {instance} {bound} {targetRunnerArgs}"
+targetCmdline = "{configurationID} {instanceID} {seed} {instance} {targetRunnerArgs}"
 
 ## Number of times to retry a call to `targetRunner` if the call failed.
 # targetRunnerRetries = 0
@@ -115,7 +118,7 @@ trainInstancesFile = "instances-list.txt"
 
 ## Maximum number of runs (invocations of `targetRunner`) that will be
 ## performed. It determines the maximum budget of experiments for the tuning.
-maxExperiments = 100
+maxExperiments = 180
 
 ## Minimum number of runs (invocations of `targetRunner`) that will be
 ## performed. It determines the minimum budget of experiments for the tuning.
@@ -237,10 +240,14 @@ maxExperiments = 100
 
 ## Parameter used to define the number of configurations sampled and evaluated
 ## at each iteration.
-# mu = 5
+mu = 3
 
 ## Confidence level for the elimination test.
 # confidence = 0.95
+
+
+# recoveryFile = "recovery.Rdata"
+
 
 ## END of scenario file
 ############################################################################

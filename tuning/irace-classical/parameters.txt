@@ -34,12 +34,26 @@
 # mutation        "--mutation="        o      ("none", "very low", "low", "medium", "high", "very high", "all")
 # unused         "-u "                c      (1, 2, 10, 20)
 
-x               "--x "                    r       (0.1, 4.0)
-y               "--y "                    i       (1, 3)
-z               "--z "                    c       ("opt1", "opt2")
+# x               "--x "                    r       (0.1, 4.0)
+# y               "--y "                    i       (1, 3)
+# z               "--z "                    c       ("opt1", "opt2")
+
+
+num_ants     "--num_ants "    i  (2, 40)
+aco_alpha    "--aco_alpha "   r  (0.2, 4.0)
+aco_beta     "--aco_beta "    r  (0.2, 8.0)
+aco_rho      "--aco_rho "     r  (0.01, 0.6)
+aco_tau0     "--aco_tau0 "    r  (0.05, 5.0)
+aco_Q        "--aco_Q "       r  (0.05, 5.0)
+aco_ls_iters "--aco_ls_iters " i (0, 10)
+
+
+[global]
+digits = 6
+
 
 [forbidden]
 # mode == "x1" & mutation == "low"
 
-[global]
-digits = 4 # Maximum number of decimal places that are significant for numerical (real) parameters.
+# [global]
+# digits = 4 # Maximum number of decimal places that are significant for numerical (real) parameters.
