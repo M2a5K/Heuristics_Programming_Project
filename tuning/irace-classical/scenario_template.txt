@@ -30,7 +30,9 @@ parameterFile = "./parameters.txt"
 ## parameters for them. If `trainInstancesDir` is provided, `irace` will
 ## search for the files in this folder.
 
-trainInstancesFile = "instances-list-50.txt"
+## trainInstancesFile = "instances-list-50.txt"
+trainInstancesFile = "@INSTANCES@"
+
 
 ## Randomly sample the training instances or use them in the order given.
 # sampleInstances = 1
