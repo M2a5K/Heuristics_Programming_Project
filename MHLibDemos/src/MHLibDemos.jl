@@ -11,6 +11,7 @@ using Graphs
 using MHLib
 
 export create_or_read_simple_graph, run_construction_experiments, run_search_experiments
+export run_genetic!
 
 """
     create_or_read_simple_graph(name::AbstractString)
@@ -61,6 +62,7 @@ include("MKP.jl")
 include("TSP.jl")
 
 include("ACO.jl") 
+include("Genetic.jl")
 include("SCFPDP.jl")
 
 

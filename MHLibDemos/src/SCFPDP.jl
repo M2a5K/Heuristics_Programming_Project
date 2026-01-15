@@ -1162,6 +1162,43 @@ function is_feasible(s::SCFPDPSolution)
     return true
 end
 
+# Extension of the above feasibility check that also checks
+# whether at least gamma requests are served.
+function is_feasible_with_gamma_check(s::SCFPDPSolution)
+    inst = s.inst
+
+    for route in s.routes
+        load = 0
+        seen_pickup = falses(inst.n)  
+
+        for node in route
+            r, is_pickup = node_to_request(inst, node)
+
+            if is_pickup
+                load += inst.c[r]
+                seen_pickup[r] = true
+            else
+                # dropoff must come after pickup
+                if !seen_pickup[r]
+                    return false
+                end
+                load -= inst.c[r]
+            end
+
+            if load < 0 || load > inst.C
+                return false
+            end
+        end
+    end
+
+    # check gamma, which is the number of requests that must be served
+    if count(s.served) < inst.gamma
+        return false
+    end
+
+    return true
+end
+
 
 """
 Assignment 2 Task 2 
