@@ -39,30 +39,30 @@ const TITER = 20
 
 # ]
 
-const INSTANCES_TEST_200 = [
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance31_nreq200_nveh4_gamma192.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance36_nreq200_nveh4_gamma181.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance41_nreq200_nveh4_gamma196.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance46_nreq200_nveh4_gamma178.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance51_nreq200_nveh4_gamma172.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance56_nreq200_nveh4_gamma171.txt"),
+# const INSTANCES_TEST_200 = [
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance31_nreq200_nveh4_gamma192.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance36_nreq200_nveh4_gamma181.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance41_nreq200_nveh4_gamma196.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance46_nreq200_nveh4_gamma178.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance51_nreq200_nveh4_gamma172.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance56_nreq200_nveh4_gamma171.txt"),
 
-]
-
-# const INSTANCES_TEST_1000 = [
-#     joinpath(@__DIR__, "..", "instances", "1000", "test", "instance31_nreq1000_nveh20_gamma890.txt"),
-#     joinpath(@__DIR__, "..", "instances", "1000", "test", "instance36_nreq1000_nveh20_gamma909.txt"),
-#     joinpath(@__DIR__, "..", "instances", "1000", "test", "instance41_nreq1000_nveh20_gamma861.txt"),
-#     joinpath(@__DIR__, "..", "instances", "1000", "test", "instance46_nreq1000_nveh20_gamma904.txt"),
-#     joinpath(@__DIR__, "..", "instances", "1000", "test", "instance51_nreq1000_nveh20_gamma929.txt"),
-#     joinpath(@__DIR__, "..", "instances", "1000", "test", "instance56_nreq1000_nveh20_gamma867.txt"),
 # ]
+
+const INSTANCES_TEST_1000 = [
+    joinpath(@__DIR__, "..", "instances", "1000", "test", "instance31_nreq1000_nveh20_gamma890.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test", "instance36_nreq1000_nveh20_gamma909.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test", "instance41_nreq1000_nveh20_gamma861.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test", "instance46_nreq1000_nveh20_gamma904.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test", "instance51_nreq1000_nveh20_gamma929.txt"),
+    joinpath(@__DIR__, "..", "instances", "1000", "test", "instance56_nreq1000_nveh20_gamma867.txt"),
+]
 
 
 # ACO tuned params for size 50 (irace o9990455, rank 1 config)
@@ -75,8 +75,8 @@ const ACO_Q        = 0.162918
 const ACO_LS_ITERS = 8
 
 
-const OUT_CSV_RAW = joinpath(@__DIR__, "results_test_aco_raw_200.csv")
-const OUT_CSV_SUM = joinpath(@__DIR__, "results_test_aco_summary_200.csv")
+const OUT_CSV_RAW = joinpath(@__DIR__, "results_test_aco_raw_1000.csv")
+const OUT_CSV_SUM = joinpath(@__DIR__, "results_test_aco_summary_1000.csv")
 
 
 function run_aco_test(instances::Vector{String})
@@ -154,4 +154,4 @@ function run_aco_test(instances::Vector{String})
     return df, df_sum
 end
 
-run_aco_test(INSTANCES_TEST_200)
+run_aco_test(INSTANCES_TEST_1000)
