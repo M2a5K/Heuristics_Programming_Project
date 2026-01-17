@@ -1,5 +1,3 @@
-include("SCFPDP.jl")
-
 using Random
 using StatsBase
 

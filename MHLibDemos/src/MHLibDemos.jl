@@ -61,9 +61,7 @@ include("MISP.jl")
 include("MKP.jl")
 include("TSP.jl")
 
-include("ACO.jl") 
-include("Genetic.jl")
-include("SCFPDP.jl")
+include("SCFPDP.jl")  # SCFPDP.jl includes ACO.jl and Genetic.jl internally
 
 
 # include("../test/tests.jl")

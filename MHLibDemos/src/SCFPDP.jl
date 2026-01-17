@@ -1629,6 +1629,10 @@ end
 
 
 
+# Include ACO and Genetic algorithms (requires the following to be defined at this point:
+# SCFPDPInstance, SCFPDPSolution, LocalSearchParams, and the associated MHLib methods)
+include("ACO.jl")
+include("Genetic.jl")
 
 
 """
@@ -1888,6 +1892,51 @@ function solve_scfpdp(alg::AbstractString = "nn_det",
         titer = 1,     # important: ACO already loops internally; 1 call is enough and it always print 1 iter 
         scheduler_kwargs...,
     )
+
+
+    # ASSIGNMENT PART2: solving with Genetic Algorithm 
+    elseif alg == "genetic"
+    pop_size = get(kwargs, :pop_size, 30)
+    crossover_rate = get(kwargs, :crossover_rate, 0.9)
+    mutation_rate = get(kwargs, :mutation_rate, 0.2)
+    tournament_size = get(kwargs, :tournament_size, 3)
+    elite_size = get(kwargs, :elite_size, 2)
+    genetic_ttime = get(kwargs, :ttime, get(kwargs, :ttime, 2.0))
+    max_generations = get(kwargs, :max_generations, 1000)
+    constr_mthd = get(kwargs, :construction_method, Symbol("nn_rand"))  # or "pilot" or "nn_det"
+    genetic_seed = get(kwargs, :ga_seed, seed)
+    verbose = get(kwargs, :verbose, false)
+
+    heuristic = GVNS(
+        sol,
+        [MHMethod("genetic_con",
+            (s, _, r) -> begin
+            MHLib.initialize!(s) 
+            s.obj_val_valid = false
+
+                run_genetic!(s;
+                    pop_size=pop_size,
+                    crossover_rate=crossover_rate,
+                    mutation_rate=mutation_rate,
+                    tournament_size=tournament_size,
+                    elite_size=elite_size,
+                    ttime=genetic_ttime,
+                    max_generations=max_generations,
+                    construction_method=constr_mthd,
+                    seed=genetic_seed,
+                    verbose=verbose
+                )
+                s.obj_val = MHLib.calc_objective(s)
+                s.obj_val_valid = true
+                r.changed = true
+            end
+        )],
+        MHMethod[],
+        MHMethod[];
+        consider_initial_sol = false,
+        titer = 1,     # Genetic Algorithm already loops internally, therefore 1 call is enough here
+        scheduler_kwargs...,
+    ) 
 
 
     elseif alg == "grasp"
