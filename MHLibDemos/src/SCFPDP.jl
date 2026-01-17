@@ -1213,15 +1213,15 @@ function fairness_value(route_times::Vector{Float64}; measure::Symbol = FAIRNESS
         s = sum(route_times)
         denom = m * sum(t^2 for t in route_times)
         return denom == 0.0 ? 0.0 : (s^2) / denom
-    # elseif measure == :maxmin
-    #     mx = maximum(route_times)
-    #     mn = minimum(route_times)
-    #     return mx <= 0.0 ? 0.0 : mn / mx
     elseif measure == :maxmin
-        eps = 1e-9
         mx = maximum(route_times)
         mn = minimum(route_times)
-        return mx <= 0.0 ? 0.0 : (mn + eps) / (mx + eps)
+        return mx <= 0.0 ? 0.0 : mn / mx
+    # elseif measure == :maxmin
+    #     eps = 1e-9
+    #     mx = maximum(route_times)
+    #     mn = minimum(route_times)
+    #     return mx <= 0.0 ? 0.0 : (mn + eps) / (mx + eps)
 
     elseif measure == :gini
         s = sum(route_times)
