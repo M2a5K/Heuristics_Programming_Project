@@ -7,21 +7,21 @@ using Statistics
 const SEEDS = 1:10
 const TITER = 20
 
-# const INSTANCES_TEST_50 = [
-#     joinpath(@__DIR__, "..", "instances", "50", "test",
-#              "instance31_nreq50_nveh2_gamma50.txt"),
-#     joinpath(@__DIR__, "..", "instances", "50", "test",
-#              "instance36_nreq50_nveh2_gamma48.txt"),
-#     joinpath(@__DIR__, "..", "instances", "50", "test",
-#              "instance41_nreq50_nveh2_gamma45.txt"),
-#     joinpath(@__DIR__, "..", "instances", "50", "test",
-#              "instance46_nreq50_nveh2_gamma47.txt"),
-#     joinpath(@__DIR__, "..", "instances", "50", "test",
-#              "instance51_nreq50_nveh2_gamma45.txt"),
-#     joinpath(@__DIR__, "..", "instances", "50", "test",
-#              "instance56_nreq50_nveh2_gamma43.txt"),
+const INSTANCES_TEST_50 = [
+    joinpath(@__DIR__, "..", "instances", "50", "test",
+             "instance31_nreq50_nveh2_gamma50.txt"),
+    joinpath(@__DIR__, "..", "instances", "50", "test",
+             "instance36_nreq50_nveh2_gamma46.txt"),
+    joinpath(@__DIR__, "..", "instances", "50", "test",
+             "instance41_nreq50_nveh2_gamma45.txt"),
+    joinpath(@__DIR__, "..", "instances", "50", "test",
+             "instance46_nreq50_nveh2_gamma47.txt"),
+    joinpath(@__DIR__, "..", "instances", "50", "test",
+             "instance51_nreq50_nveh2_gamma45.txt"),
+    joinpath(@__DIR__, "..", "instances", "50", "test",
+             "instance56_nreq50_nveh2_gamma43.txt"),
 
-# ]
+]
 
 # const INSTANCES_TEST_100 = [
 #     joinpath(@__DIR__, "..", "instances", "100", "test",
@@ -39,21 +39,21 @@ const TITER = 20
 
 # ]
 
-const INSTANCES_TEST_200 = [
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance31_nreq200_nveh4_gamma192.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance36_nreq200_nveh4_gamma181.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance41_nreq200_nveh4_gamma196.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance46_nreq200_nveh4_gamma178.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance51_nreq200_nveh4_gamma172.txt"),
-    joinpath(@__DIR__, "..", "instances", "200", "test",
-             "instance56_nreq200_nveh4_gamma171.txt"),
+# const INSTANCES_TEST_200 = [
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance31_nreq200_nveh4_gamma192.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance36_nreq200_nveh4_gamma181.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance41_nreq200_nveh4_gamma196.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance46_nreq200_nveh4_gamma178.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance51_nreq200_nveh4_gamma172.txt"),
+#     joinpath(@__DIR__, "..", "instances", "200", "test",
+#              "instance56_nreq200_nveh4_gamma171.txt"),
 
-]
+# ]
 
 # const INSTANCES_TEST_1000 = [
 #     joinpath(@__DIR__, "..", "instances", "1000", "test", "instance31_nreq1000_nveh20_gamma890.txt"),
@@ -65,14 +65,14 @@ const INSTANCES_TEST_200 = [
 # ]
 
 
-# # ACO tuned params for size 50 (irace o9990455, rank 1 config)
-# const ACO_NUM_ANTS = 17
-# const ACO_ALPHA    = 0.878462
-# const ACO_BETA     = 5.649290
-# const ACO_RHO      = 0.036810
-# const ACO_TAU0     = 4.436573
-# const ACO_Q        = 0.162918
-# const ACO_LS_ITERS = 8
+# ACO tuned params for size 50 (irace o9990455, rank 1 config)
+const ACO_NUM_ANTS = 17
+const ACO_ALPHA    = 0.878462
+const ACO_BETA     = 5.649290
+const ACO_RHO      = 0.036810
+const ACO_TAU0     = 4.436573
+const ACO_Q        = 0.162918
+const ACO_LS_ITERS = 8
 
 # # ACO tuned params for size 100 (irace rank 1 config)
 # const ACO_NUM_ANTS = 39
@@ -83,18 +83,18 @@ const INSTANCES_TEST_200 = [
 # const ACO_Q        = 0.1204
 # const ACO_LS_ITERS = 2
 
-# ACO tuned params for size 200 (irace rank 1 config)
-const ACO_NUM_ANTS = 37
-const ACO_ALPHA    = 3.87
-const ACO_BETA     = 3.54
-const ACO_RHO      = 0.49
-const ACO_TAU0     = 1.32
-const ACO_Q        = 4.05
-const ACO_LS_ITERS = 4
+# # ACO tuned params for size 200 (irace rank 1 config)
+# const ACO_NUM_ANTS = 37
+# const ACO_ALPHA    = 3.87
+# const ACO_BETA     = 3.54
+# const ACO_RHO      = 0.49
+# const ACO_TAU0     = 1.32
+# const ACO_Q        = 4.05
+# const ACO_LS_ITERS = 4
 
 
-const OUT_CSV_RAW = joinpath(@__DIR__, "results_test_aco_raw_200.csv")
-const OUT_CSV_SUM = joinpath(@__DIR__, "results_test_aco_summary_200.csv")
+const OUT_CSV_RAW = joinpath(@__DIR__, "results_test_aco_raw_50.csv")
+const OUT_CSV_SUM = joinpath(@__DIR__, "results_test_aco_summary_50.csv")
 
 
 function run_aco_test(instances::Vector{String})
@@ -172,4 +172,4 @@ function run_aco_test(instances::Vector{String})
     return df, df_sum
 end
 
-run_aco_test(INSTANCES_TEST_200)
+run_aco_test(INSTANCES_TEST_50)

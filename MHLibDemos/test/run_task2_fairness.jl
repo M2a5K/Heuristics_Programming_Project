@@ -78,10 +78,21 @@ const INSTANCES_TEST_200 = [
     "instance56_nreq200_nveh4_gamma171.txt",
 ]
 
+const INSTANCES_TEST_500 = [
+    "instance31_nreq500_nveh10_gamma465.txt",
+    "instance36_nreq500_nveh10_gamma472.txt",
+    "instance41_nreq500_nveh10_gamma470.txt",
+    # "instance46_nreq200_nveh4_gamma178.txt",
+    # "instance51_nreq200_nveh4_gamma172.txt",
+    # "instance56_nreq200_nveh4_gamma171.txt",
+]
+
 instance_sets = [
-    (50,  joinpath(@__DIR__, "..", "instances", "50",  "test"), INSTANCES_TEST_50),
-    (100, joinpath(@__DIR__, "..", "instances", "100", "test"), INSTANCES_TEST_100),
-    (200, joinpath(@__DIR__, "..", "instances", "200", "test"), INSTANCES_TEST_200),
+    # (50,  joinpath(@__DIR__, "..", "instances", "50",  "test"), INSTANCES_TEST_50),
+    # (100, joinpath(@__DIR__, "..", "instances", "100", "test"), INSTANCES_TEST_100),
+    # (200, joinpath(@__DIR__, "..", "instances", "200", "test"), INSTANCES_TEST_200),
+    (500, joinpath(@__DIR__, "..", "instances", "500", "test"), INSTANCES_TEST_500),
+
 ]
 
 seeds = 1:5
@@ -89,7 +100,7 @@ fairnesses = [:jain, :maxmin, :gini]
 
 outdir = joinpath(@__DIR__, "results")
 mkpath(outdir)
-outfile = joinpath(outdir, "fairness_experiment_$(Dates.format(now(), "yyyymmdd_HHMM")).csv")
+outfile = joinpath(outdir, "only 500 fairness_experiment_$(Dates.format(now(), "yyyymmdd_HHMM")).csv")
 
 open(outfile, "w") do io
     println(io, "n,instance,seed,fairness,obj,feasible,served,iters,runtime,route_times,stops_per_route,total_stops,fairness_value")

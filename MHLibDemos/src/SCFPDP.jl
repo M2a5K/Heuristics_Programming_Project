@@ -1209,6 +1209,9 @@ function fairness_value(route_times::Vector{Float64}; measure::Symbol = FAIRNESS
     m = length(route_times)
     m == 0 && return 0.0
 
+    mx_all = maximum(route_times)
+    mx_all == 0.0 && return 1.0  # perfectly balanced: everyone has 0
+
     if measure == :jain
         s = sum(route_times)
         denom = m * sum(t^2 for t in route_times)
@@ -1222,6 +1225,14 @@ function fairness_value(route_times::Vector{Float64}; measure::Symbol = FAIRNESS
     #     mx = maximum(route_times)
     #     mn = minimum(route_times)
     #     return mx <= 0.0 ? 0.0 : (mn + eps) / (mx + eps)
+    # elseif measure == :maxmin
+    #     mn = minimum(route_times)
+    #     return mn / mx_all
+
+    # elseif measure == :maxmin
+    #     active = [t for t in route_times if t > 0.0]
+    #     length(active) <= 1 && return 1.0
+    #     return minimum(active) / maximum(active)
 
     elseif measure == :gini
         s = sum(route_times)
