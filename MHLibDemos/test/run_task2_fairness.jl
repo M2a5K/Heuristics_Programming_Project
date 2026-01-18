@@ -6,6 +6,12 @@ include(joinpath(@__DIR__, "..", "src", "MHLibDemos.jl"))
 using .MHLibDemos
 using MHLib
 
+###############################################
+###### Choose method: "aco" or "genetic" ######
+###############################################
+const METHOD = "genetic"
+
+
 function route_times_and_stops(sol::MHLibDemos.SCFPDPSolution)
     inst = sol.inst
     rt = Float64[]
@@ -22,20 +28,37 @@ end
 function run_one(filename::String; seed::Int, fairness::Symbol)
     MHLibDemos.set_fairness!(fairness)
 
-    sol, iters, runtime = MHLibDemos.solve_scfpdp(
-        "aco", filename;
-        seed=seed,
-        ttime=2.0,
-        aco_ttime=2.0,
-        num_ants=5,
-        aco_alpha=1.0,
-        aco_beta=3.0,
-        aco_rho=0.25,
-        aco_Q=0.2,
-        aco_tau0=1.0,
-        aco_lsparams=MHLibDemos.LocalSearchParams(:two_opt, :first_improvement, false),
-        aco_ls_iters=2,
-    )
+    if METHOD == "aco"
+        sol, iters, runtime = MHLibDemos.solve_scfpdp(
+            "aco", filename;
+            seed=seed,
+            ttime=2.0,
+            aco_ttime=2.0,
+            num_ants=5,
+            aco_alpha=1.0,
+            aco_beta=3.0,
+            aco_rho=0.25,
+            aco_Q=0.2,
+            aco_tau0=1.0,
+            aco_lsparams=MHLibDemos.LocalSearchParams(:two_opt, :first_improvement, false),
+            aco_ls_iters=2,
+        )
+
+        
+    elseif METHOD == "genetic"
+        sol, iters, runtime = MHLibDemos.solve_scfpdp(
+            "genetic", filename;
+            seed=seed,
+            ttime=2.0,
+            pop_size=30,
+            crossover_rate=0.9,
+            mutation_rate=0.2,
+            tournament_size=3,
+            elite_size=2,
+            max_generations=1000,
+            construction_method=:nn_rand,
+        )
+    end
 
     rt, st = route_times_and_stops(sol)
     # fair = MHLibDemos.fairness_value(rt, fairness) 
@@ -88,9 +111,9 @@ const INSTANCES_TEST_500 = [
 ]
 
 instance_sets = [
-    # (50,  joinpath(@__DIR__, "..", "instances", "50",  "test"), INSTANCES_TEST_50),
-    # (100, joinpath(@__DIR__, "..", "instances", "100", "test"), INSTANCES_TEST_100),
-    # (200, joinpath(@__DIR__, "..", "instances", "200", "test"), INSTANCES_TEST_200),
+    (50,  joinpath(@__DIR__, "..", "instances", "50",  "test"), INSTANCES_TEST_50),
+    (100, joinpath(@__DIR__, "..", "instances", "100", "test"), INSTANCES_TEST_100),
+    (200, joinpath(@__DIR__, "..", "instances", "200", "test"), INSTANCES_TEST_200),
     (500, joinpath(@__DIR__, "..", "instances", "500", "test"), INSTANCES_TEST_500),
 
 ]
@@ -100,7 +123,7 @@ fairnesses = [:jain, :maxmin, :gini]
 
 outdir = joinpath(@__DIR__, "results")
 mkpath(outdir)
-outfile = joinpath(outdir, "only 500 fairness_experiment_$(Dates.format(now(), "yyyymmdd_HHMM")).csv")
+outfile = joinpath(outdir, "fairness_experiment_$(METHOD)_$(Dates.format(now(), "yyyymmdd_HHMM")).csv")
 
 open(outfile, "w") do io
     println(io, "n,instance,seed,fairness,obj,feasible,served,iters,runtime,route_times,stops_per_route,total_stops,fairness_value")
